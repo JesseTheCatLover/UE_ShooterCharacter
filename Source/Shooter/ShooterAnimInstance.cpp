@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright 2023 JesseTheCatLover. All Rights Reserved.
 
 
 #include "ShooterAnimInstance.h"
@@ -38,16 +38,9 @@ void UShooterAnimInstance::UpdateAnimationProperties(float DeltaTime)
 		FRotator MovementRotation = UKismetMathLibrary::MakeRotFromX(ShooterCharacter -> GetVelocity());
 		MovementOffsetYaw = UKismetMathLibrary::NormalizedDeltaRotator(MovementRotation, AimRotation).Yaw;
 
-		FString MovementOffsetMessage = FString::Printf(TEXT("Movement offset: %f"), MovementOffsetYaw);
-
 		if(ShooterCharacter -> GetVelocity().Size() > 0.f)
 		{
 			LastMovementOffsetYaw = MovementOffsetYaw;
-		}
-		
-		if(GEngine)
-		{
-			GEngine -> AddOnScreenDebugMessage(1, 0.f, FColor::White, MovementOffsetMessage);
 		}
 
 		bAiming = ShooterCharacter -> GetAiming();

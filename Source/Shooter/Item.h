@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright 2023 JesseTheCatLover. All Rights Reserved.
 
 #pragma once
 
@@ -58,6 +58,12 @@ protected:
 
 	/** Set properties for Item's components based on State */
 	void UpdateItemProperties(EItemState State);
+
+	/** Called when Curves are finished */
+	void FinishAnimCurves();
+
+	/** Handle item pickup interpolation when (bInterping = true) */
+	void PickupInterpHandler(float DeltaTime);
 	
 public:	
 	// Called every frame
@@ -99,6 +105,40 @@ private:
 	/** AItem states for interactions */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Item Properties", meta = (AllowPrivateAccess = "true"))
 	EItemState ItemState;
+
+	/** The curve asset to use for item's z location when interpolating */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item Properties", meta = (AllowPrivateAccess = "true"))
+	class UCurveFloat* ItemZCurve;
+
+	/** The location item starts interpolating for pickup */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Item Properties", meta = (AllowPrivateAccess = "true"))
+	FVector ItemInterpStartLocation;
+
+	/** The location item finished interpolation for pickup */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Item Properties", meta = (AllowPrivateAccess = "true"))
+	FVector ItemInterpCameraTargetLocation;
+	
+	/** True when interpolating */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Item Properties", meta = (AllowPrivateAccess = "true"))
+	bool bInterping;
+
+	/** Timer to handle item pickup interpolation */
+	FTimerHandle CurveTimer;
+	
+	/** The point in timeline where curves stop */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item Properties", meta = (AllowPrivateAccess = "true"))
+	float CurveDuration;
+	
+	/** Reference to AShooterCharacter to access its public functions */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Item Properties", meta = (AllowPrivateAccess = "true"))
+	class AShooterCharacter* Character;
+
+	/** Initial yaw offset between the camera yaw and item yaw once the item is picked up*/
+	float InterpInitialYawOffset;
+
+	/** The curve asset to use for item's scale when interpolating (optional) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item Properties", meta = (AllowPrivateAccess = "true"))
+	UCurveFloat* ItemScaleCurve;
 	
 public:	
 	FORCEINLINE UWidgetComponent* GetPickupWidget() const { return PickupWidget; }
@@ -106,6 +146,12 @@ public:
 	FORCEINLINE USphereComponent* GetAreaSphere() const { return AreaSphere; }
 	FORCEINLINE EItemState GetItemState() const { return ItemState; }
 	FORCEINLINE USkeletalMeshComponent* GetItemMesh() const { return ItemMesh; }
+	
 	/** Set new state for ItemState and calls UpdateItemProperties() */
 	void SetItemState(EItemState State);
+	
+	/** Play CurveTimer and call PickupInterpHandler() every frame
+	 *	to handle pickup interpolation based on the curve values
+	 *	@param Char This is a pointer to the player who is picking up the item */
+	void StartAnimCurves(AShooterCharacter* Char);
 };

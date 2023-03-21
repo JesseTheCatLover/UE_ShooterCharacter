@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright 2023 JesseTheCatLover. All Rights Reserved.
 
 #pragma once
 
@@ -56,6 +56,8 @@ protected:
 
 	/** Set bAiming to true or false with button pressed */
 	void AimingButtonPressed();
+
+	/** Set bAiming to true or false with button pressed */
 	void AimingButtonReleased();
 
 	/** Perform a line trace from crosshair screen location outward */
@@ -91,7 +93,7 @@ protected:
 	void FireTimerReset();
 
 	/** Trace for items if OverlappedItemCount > 0 */
-	void TraceForItems();
+	void PickupTrace();
 
 	/** Spawn default Weapon for the character */
 	class AWeapon* SpawnDefaultWeapon();
@@ -102,8 +104,15 @@ protected:
 	/** Detach Weapon from HandSocket and drop it */
 	void DropWeapon();
 
+	void SelectButtonPressed();
+	void SelectButtonReleased();
+	
 	void DropButtonPressed();
 	void DropButtonReleased();
+
+	/** Drops currently equipped Weapon and equips PickupTraceHitItem */
+	void SwapWeapon(AWeapon* WeaponToSwap);
+	
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
@@ -248,9 +257,13 @@ private:
 	/** Number of overlapped AItem */
 	int8 OverlappedItemCount;
 
-	/** The AItem we hit last frame */
+	/** The AItem we currently hit by our trace in PickupTrace (could we null) */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Combat, meta = (AllowPrivateAccess = "true"))
+	class AItem* PickupTraceHitItem;
+	
+	/** The AItem we hit last frame in PickupTrace */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Items , meta = (AllowPrivateAccess = "true"))
-	class AItem* PreviousTraceHitItem;
+	AItem* PreviousPickupTraceHitItem;
 
 	/** Currently equipped weapon */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Combat , meta = (AllowPrivateAccess = "true"))
@@ -259,6 +272,14 @@ private:
 	/** Set default weapon class blueprint */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Combat , meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<AWeapon> DefaultWeaponClass;
+
+	/** Distance of desired location for Item pickup interpolation from the camera */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Combat, meta = (AllowPrivateAccess = "true"))
+	float CameraPickupInterpDistance;
+
+	/** Elevation of desired location for Item pickup interpolation from the camera */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Combat, meta = (AllowPrivateAccess = "true"))
+	float CameraPickupInterpElevation;
 	
 public:
 	/** Returns CameraBoom subObject */
@@ -276,4 +297,12 @@ public:
 
 	/** Adds/subtracts OverlappedItemCount and updates bShouldTraceForItems  */
 	void IncrementOverlappedItemCount(int8 Value);
+
+	/** Get the desired location for Item pick up interpolation */
+	FVector GetPickupInterpTargetLocation();
+
+	/** Set an item to pickup
+	 * @param Item Item to pick up
+	 */
+	void PickupItem(AItem* Item);
 };

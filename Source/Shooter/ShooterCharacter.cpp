@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright 2023 JesseTheCatLover. All Rights Reserved.
 
 
 #include "ShooterCharacter.h"
@@ -7,8 +7,6 @@
 #include "Weapon.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
-#include "Components/BoxComponent.h"
-#include "Components/SphereComponent.h"
 #include "Components/WidgetComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -51,7 +49,12 @@ AShooterCharacter::AShooterCharacter():
     AutomaticFireRate(0.1f),
 	CrosshairShootingDuration(0.05f),
 	// Item trace variables
-	bShouldTraceForItems(false)
+	bShouldTraceForItems(false),
+	OverlappedItemCount(0),
+	// Camera pickup interpolation variables
+	CameraPickupInterpDistance(250.f),
+	CameraPickupInterpElevation(65.f)
+	
 {
 	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
@@ -134,76 +137,63 @@ void AShooterCharacter::LookUpRate(float Rate)
 
 void AShooterCharacter::Turn(float Value)
 {
-	float TurnScaleFactor{};
-	if(bAiming)
-	{
-		TurnScaleFactor = MouseAimingTurnRate;
-	}
-	else
-	{
-		TurnScaleFactor = MouseHipTurnRate;
-	}
+	const float TurnScaleFactor = bAiming ? MouseAimingTurnRate : MouseHipTurnRate;
 	AddControllerYawInput(Value * TurnScaleFactor);
 }
 
 void AShooterCharacter::LookUp(float Value)
 {
-	float LookUpScaleFactor{};
-	if(bAiming)
-	{
-		LookUpScaleFactor = MouseAimingLookUpRate;
-	}
-	else
-	{
-		LookUpScaleFactor = MouseHipLookUpRate;
-	}
+	const float LookUpScaleFactor = bAiming ? MouseAimingLookUpRate : MouseHipLookUpRate;
 	AddControllerPitchInput(Value * LookUpScaleFactor);
 }
 
 void AShooterCharacter::FireAction()
 {
-	if(FireSound)
+	if(EquippedWeapon) // Check to see if we currently holding a Weapon
 	{
-		UGameplayStatics::PlaySound2D(this, FireSound);
-	}
-	const USkeletalMeshSocket* BarrelSocket = GetMesh() -> GetSocketByName("BarrelSocket");
-	if(BarrelSocket)
-	{
-		const FTransform SocketTransform = BarrelSocket -> GetSocketTransform(GetMesh());
-		if(MuzzleFlash)
+		if(FireSound)
 		{
-			UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), MuzzleFlash, SocketTransform);
+			UGameplayStatics::PlaySound2D(this, FireSound);
 		}
-
-		FVector BeamEndLocation;
-		bool bBeamEnd = LineTraceFromGunBarrel(SocketTransform.GetLocation(), BeamEndLocation);
-		if(bBeamEnd)
+		const USkeletalMeshSocket* BarrelSocket = EquippedWeapon -> GetItemMesh() -> GetSocketByName("BarrelSocket");
+		if(BarrelSocket)
 		{
-			if(ImpactParticles)
+			const FTransform SocketTransform = BarrelSocket -> GetSocketTransform(GetMesh());
+			if(MuzzleFlash)
 			{
-				UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactParticles, BeamEndLocation);
+				UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), MuzzleFlash, SocketTransform);
 			}
 
-			if(BeamParticles)
+			FVector BeamEndLocation;
+			bool bBeamEnd = LineTraceFromGunBarrel(SocketTransform.GetLocation(), BeamEndLocation);
+			if(bBeamEnd)
 			{
-				UParticleSystemComponent* Beam = UGameplayStatics::SpawnEmitterAtLocation(
-					GetWorld(), BeamParticles, SocketTransform);
-				if(Beam)
+				if(ImpactParticles)
 				{
-					Beam -> SetVectorParameter(FName("Target"), BeamEndLocation);
+					UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactParticles, BeamEndLocation);
+				}
+
+				if(BeamParticles)
+				{
+					UParticleSystemComponent* Beam = UGameplayStatics::SpawnEmitterAtLocation(
+						GetWorld(), BeamParticles, SocketTransform);
+					if(Beam)
+					{
+						Beam -> SetVectorParameter(FName("Target"), BeamEndLocation);
+					}
 				}
 			}
 		}
-	}
-	UAnimInstance* AnimInstance = GetMesh() -> GetAnimInstance();
-	if(AnimInstance && HipFireMontage)
-	{
-		AnimInstance -> Montage_Play(HipFireMontage);
-		AnimInstance -> Montage_JumpToSection(FName("StartFire"));
-	}
+		UAnimInstance* AnimInstance = GetMesh() -> GetAnimInstance();
+		if(AnimInstance && HipFireMontage)
+		{
+			AnimInstance -> Montage_Play(HipFireMontage);
+			AnimInstance -> Montage_JumpToSection(FName("StartFire"));
+		}
 
-	// Start bullet fire timer for crosshairs
-	StartCrosshairBulletFire();
+		// Start bullet fire timer for crosshairs
+		StartCrosshairBulletFire();
+	}
 }
 
 bool AShooterCharacter::LineTraceFromCrosshair(FHitResult &OutHitResult)
@@ -281,7 +271,10 @@ void AShooterCharacter::FireButtonReleased()
 
 void AShooterCharacter::AimingButtonPressed()
 {
-	bAiming = true;
+	if(EquippedWeapon) // We can only aim when holding a Weapon
+	{
+		bAiming = true;
+	}
 }
 
 void AShooterCharacter::AimingButtonReleased()
@@ -289,9 +282,24 @@ void AShooterCharacter::AimingButtonReleased()
 	bAiming = false;
 }
 
+void AShooterCharacter::SelectButtonPressed()
+{
+	if(PickupTraceHitItem)
+	{
+		PickupTraceHitItem -> StartAnimCurves(this);
+		PickupTraceHitItem = nullptr;
+		PreviousPickupTraceHitItem = nullptr;
+	}
+}
+
+void AShooterCharacter::SelectButtonReleased()
+{
+	
+}
+
 void AShooterCharacter::DropButtonPressed()
 {
-	DropWeapon();	
+	DropWeapon();
 }
 
 void AShooterCharacter::DropButtonReleased()
@@ -390,7 +398,7 @@ void AShooterCharacter::FinishCrosshairBulletFire()
 
 void AShooterCharacter::StartFireTimer()
 {
-	if(bShouldFire)
+	if(EquippedWeapon && bShouldFire)
 	{
 		bShouldFire = false;
 		FireAction();
@@ -407,7 +415,7 @@ void AShooterCharacter::FireTimerReset()
 	}
 }
 
-void AShooterCharacter::TraceForItems()
+void AShooterCharacter::PickupTrace()
 {
 	if(bShouldTraceForItems)
 	{
@@ -416,29 +424,29 @@ void AShooterCharacter::TraceForItems()
 		
 		if(ItemTraceResult.bBlockingHit)
 		{
-			AItem* TraceHitItem = Cast<AItem>(ItemTraceResult.GetActor());
-			if(TraceHitItem && TraceHitItem -> GetPickupWidget())
+			PickupTraceHitItem = Cast<AItem>(ItemTraceResult.GetActor());
+			if(PickupTraceHitItem && PickupTraceHitItem -> GetPickupWidget())
 			{
 				// Show Item pickup widget
-				TraceHitItem -> GetPickupWidget() -> SetVisibility(true);
+				PickupTraceHitItem -> GetPickupWidget() -> SetVisibility(true);
 			}
 
-			// if linetrace hit an item last frame
-			if(PreviousTraceHitItem)
+			// If linetrace hit an item last frame
+			if(PreviousPickupTraceHitItem)
 			{
-				if(TraceHitItem != PreviousTraceHitItem) // if linetrace hit a new item this frame
+				if(PickupTraceHitItem != PreviousPickupTraceHitItem) // If linetrace hit a new item this frame
 				{
-					PreviousTraceHitItem -> GetPickupWidget() -> SetVisibility(false);
+					PreviousPickupTraceHitItem -> GetPickupWidget() -> SetVisibility(false);
 				}
 			}
 			
 			// Saving a reference to the item linetrace hit, last frame. or either null ptr.
-			PreviousTraceHitItem = TraceHitItem;
+			PreviousPickupTraceHitItem = PickupTraceHitItem;
 		}
 	}
-	else if(PreviousTraceHitItem) // if character no longer overlap items, and the last item isn't null.
+	else if(PreviousPickupTraceHitItem) // If character no longer overlap items, and the last item isn't null.
 	{
-		PreviousTraceHitItem -> GetPickupWidget() -> SetVisibility(false);
+		PreviousPickupTraceHitItem -> GetPickupWidget() -> SetVisibility(false);
 	}
 }
 
@@ -472,9 +480,17 @@ void AShooterCharacter::DropWeapon()
 	{
 		FDetachmentTransformRules DetachmentTransformRule(EDetachmentRule::KeepWorld, true);
 		EquippedWeapon -> GetItemMesh() -> DetachFromComponent(DetachmentTransformRule);
-
+		
 		EquippedWeapon -> SetItemState(EItemState::EIS_Falling);
+		EquippedWeapon -> ThrowWeapon();
+		EquippedWeapon = nullptr;
 	}
+}
+
+void AShooterCharacter::SwapWeapon(AWeapon* WeaponToSwap)
+{
+	DropWeapon();
+	EquipWeapon(WeaponToSwap);
 }
 
 // Called every frame
@@ -489,7 +505,7 @@ void AShooterCharacter::Tick(float DeltaTime)
 	// Calculate crosshair spread multiplier
 	CalculateCrosshairSpread(DeltaTime);
 	// Trace for items while overlapping items
-	TraceForItems();
+	PickupTrace();
 }
 
 // Called to bind functionality to input
@@ -511,6 +527,8 @@ void AShooterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 	PlayerInputComponent->BindAction("FireButton", IE_Released, this, &AShooterCharacter::FireButtonReleased);
 	PlayerInputComponent->BindAction("AimingButton", IE_Pressed, this, &AShooterCharacter::AimingButtonPressed);
 	PlayerInputComponent->BindAction("AimingButton", IE_Released, this, &AShooterCharacter::AimingButtonReleased);
+	PlayerInputComponent->BindAction("Select", IE_Pressed, this, &AShooterCharacter::SelectButtonPressed);
+	PlayerInputComponent->BindAction("Select", IE_Released, this, &AShooterCharacter::SelectButtonReleased);
 	PlayerInputComponent->BindAction("Drop", IE_Pressed, this, &AShooterCharacter::DropButtonPressed);
 	PlayerInputComponent->BindAction("Drop", IE_Released, this, &AShooterCharacter::DropButtonReleased);
 }
@@ -531,5 +549,23 @@ void AShooterCharacter::IncrementOverlappedItemCount(int8 Value)
 	{
 		OverlappedItemCount += Value;
 		bShouldTraceForItems = true;
+	}
+}
+
+FVector AShooterCharacter::GetPickupInterpTargetLocation()
+{
+	const FVector CameraWorldLocation{ FollowCamera -> GetComponentLocation() };
+	const FVector CameraForward{ FollowCamera -> GetForwardVector() };
+	// Desired location = Camera location + (Forward * A) + (Up * B)
+	return CameraWorldLocation + (CameraForward * CameraPickupInterpDistance) + FVector(0.f, 0.f,
+		CameraPickupInterpElevation);
+}
+
+void AShooterCharacter::PickupItem(AItem* Item)
+{
+	auto Weapon = Cast<AWeapon>(Item);
+	if(Weapon)
+	{
+		SwapWeapon(Weapon);
 	}
 }
