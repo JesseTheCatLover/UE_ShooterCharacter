@@ -6,6 +6,25 @@
 #include "GameFramework/Character.h"
 #include "ShooterCharacter.generated.h"
 
+UENUM(BlueprintType)
+enum class ECombatState : uint8
+{
+	ECS_Unoccupied UMETA(DisplayName = "Unoccupied"),
+	ECS_FireRateTimerInProgress UMETA(DisplayName = "FireRateTimerInProgress"),
+	ECS_Reloading UMETA(DisplayName = "Reloading"),
+
+	ECS_Max UMETA(Display = "DefaultMax")
+};
+
+UENUM(BlueprintType)
+enum class EAmmoType : uint8
+{
+	EAT_9mm UMETA(DisplayName = "9mm"),
+	EAT_AR UMETA(DisplayName = "Assualt Riffle"),
+
+	EAT_Max UMETA(DisplayName = "DefaultMax")
+};
+
 UCLASS()
 class SHOOTER_API AShooterCharacter : public ACharacter
 {
@@ -52,7 +71,7 @@ protected:
 	/**
 	 * Called when the fire button is pressed
 	 */
-	void FireAction();
+	void FireWeapon();
 
 	/** Set bAiming to true or false with button pressed */
 	void AimingButtonPressed();
@@ -88,9 +107,9 @@ protected:
 	/** Automatic fire loop */
 	void FireButtonPressed();
 	void FireButtonReleased();
-	void StartFireTimer();
+	void StartFireRateTimer();
 	UFUNCTION()
-	void FireTimerReset();
+	void FireRateTimerReset();
 
 	/** Trace for items if OverlappedItemCount > 0 */
 	void PickupTrace();
@@ -112,6 +131,21 @@ protected:
 
 	/** Drops currently equipped Weapon and equips PickupTraceHitItem */
 	void SwapWeapon(AWeapon* WeaponToSwap);
+
+	/** Initialize the AmmoMap with ammo values */
+	void InitializeAmmoMap();
+
+	/** Return true if EquippedWeapon has ammo */
+	bool WeaponHasAmmo();
+
+	/** Play firing sound */
+	void PlayFireSound();
+
+	/** Perform linetrace for shooting and gathering information */
+	void SendBullet();
+
+	/** Play HipFire montage animation */
+	void PlayHipFireMontage();
 	
 public:	
 	// Called every frame
@@ -246,7 +280,7 @@ private:
 	float CrosshairShootingDuration;
 	
 	/** Sets a timer between gunshots */
-	FTimerHandle AutomaticFireTimer;
+	FTimerHandle AutomaticFireRateTimer;
 
 	/** Sets a timer between crosshair spreads */
 	FTimerHandle CrosshairShootTimer;
@@ -280,6 +314,22 @@ private:
 	/** Elevation of desired location for Item pickup interpolation from the camera */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Combat, meta = (AllowPrivateAccess = "true"))
 	float CameraPickupInterpElevation;
+
+	/** Map to keep track of ammo of different ammo types */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Combat, meta = (AllowPrivateAccess = "true"))
+	TMap<EAmmoType, int32> AmmoMap;
+
+	/** Starting amount of 9mm ammo */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Combat, meta = (AllowPrivateAccess = "true"))
+	int32 Starting9mmAmmo;
+
+	/** Starting amount of 9mm ammo */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Combat, meta = (AllowPrivateAccess = "true"))
+	int32 StartingARAmmo;
+
+	/** State of Character's combat */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Combat, meta = (AllowPrivateAccess = "true"))
+	ECombatState CombatState;
 	
 public:
 	/** Returns CameraBoom subObject */
