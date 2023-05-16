@@ -86,6 +86,9 @@ AShooterCharacter::AShooterCharacter():
 	GetCharacterMovement() -> RotationRate = FRotator(0.f, 540.f, 0.f); //... at this rate
 	GetCharacterMovement() -> JumpZVelocity = 600.f;
 	GetCharacterMovement() -> AirControl = 0.1f;
+
+	// Create a ClipSceneComponent
+	ClipSceneComponent = CreateDefaultSubobject<USceneComponent>(TEXT("ClipSceneComponent"));
 }
 
 void AShooterCharacter::BeginPlay()
@@ -268,6 +271,11 @@ void AShooterCharacter::SelectButtonPressed()
 	if(PickupTraceHitItem)
 	{
 		PickupTraceHitItem -> StartAnimCurves(this);
+		if(PickupTraceHitItem -> GetPickupSound())
+		{
+			UGameplayStatics::PlaySound2D(this, PickupTraceHitItem -> GetPickupSound());
+		}
+		
 		PickupTraceHitItem = nullptr;
 		PreviousPickupTraceHitItem = nullptr;
 	}
@@ -396,7 +404,7 @@ void AShooterCharacter::FireRateTimerReset()
 	}
 	else // Weapon is empty
 	{
-		// Reloading weapon
+		ReloadWeapon();
 	}
 }
 
@@ -541,6 +549,91 @@ void AShooterCharacter::PlayHipFireMontage()
 	}
 }
 
+void AShooterCharacter::ReloadButtonPressed()
+{
+	ReloadWeapon();
+}
+
+void AShooterCharacter::ReloadWeapon()
+{
+	if(CombatState != ECombatState::ECS_Unoccupied) return;
+	if(EquippedWeapon == nullptr) return;
+	
+	if(CarryingAmmo()) // are we carrying the correct type of ammo?
+	{
+		CombatState = ECombatState::ECS_Reloading;
+		UAnimInstance* AnimInstance = GetMesh() -> GetAnimInstance();
+		if(AnimInstance && ReloadMontage)
+		{
+			AnimInstance ->	Montage_Play(ReloadMontage);
+			AnimInstance -> Montage_JumpToSection(EquippedWeapon -> GetReloadMontageSection());
+		}
+	}
+}
+
+void AShooterCharacter::FinishReloading()
+{
+	CombatState = ECombatState::ECS_Unoccupied;
+	if(EquippedWeapon == nullptr) return;
+	const auto AmmoType = EquippedWeapon -> GetAmmoType();
+	
+	if(AmmoMap.Contains(AmmoType))
+	{
+		int32 CarriedAmmo = AmmoMap[AmmoType];
+		const int32 MagEmptySpace = EquippedWeapon -> GetMagazineCapacity() - EquippedWeapon -> GetAmmo();
+
+		if(CarriedAmmo < MagEmptySpace)
+		{
+			// Reload the magazine with all the ammo we are carrying
+			EquippedWeapon -> ReloadAmmo(CarriedAmmo);
+			CarriedAmmo = 0;
+		}
+		else
+		{
+			// Fully fill the magazine
+			EquippedWeapon -> ReloadAmmo(MagEmptySpace);
+			CarriedAmmo -= MagEmptySpace;
+		}
+		// Assign the value to AmmoMap
+		AmmoMap.Add(AmmoType, CarriedAmmo);
+	}
+}
+
+bool AShooterCharacter::CarryingAmmo()
+{
+	if(EquippedWeapon == nullptr) return false;
+
+	auto AmmoType = EquippedWeapon -> GetAmmoType();
+	if(AmmoMap.Contains(AmmoType))
+	{
+		return AmmoMap[AmmoType] > 0;
+	}
+	return false;
+}
+
+void AShooterCharacter::GrabClip()
+{
+	if(EquippedWeapon == nullptr) return;
+	if(ClipSceneComponent == nullptr) return;
+	
+	const int32 ClipBoneIndex{ EquippedWeapon -> GetItemMesh() -> GetBoneIndex(EquippedWeapon -> GetClipBoneName()) };
+	// Initial transform of the clip when hand first touches the clip
+	ClipTransform = EquippedWeapon -> GetItemMesh() -> GetBoneTransform(ClipBoneIndex);
+	
+	const FAttachmentTransformRules AttachmentRules{ EAttachmentRule::KeepRelative, true };
+	ClipSceneComponent -> AttachToComponent(GetMesh(), AttachmentRules, FName(TEXT("hand_l")));
+	ClipSceneComponent -> SetWorldTransform(ClipTransform);
+
+	EquippedWeapon -> SetMovingClip(true);
+}
+
+void AShooterCharacter::ReleaseClip()
+{
+	if(EquippedWeapon == nullptr) return;
+
+	EquippedWeapon -> SetMovingClip(false);
+}
+
 // Called every frame
 void AShooterCharacter::Tick(float DeltaTime)
 {
@@ -579,6 +672,7 @@ void AShooterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 	PlayerInputComponent->BindAction("Select", IE_Released, this, &AShooterCharacter::SelectButtonReleased);
 	PlayerInputComponent->BindAction("Drop", IE_Pressed, this, &AShooterCharacter::DropButtonPressed);
 	PlayerInputComponent->BindAction("Drop", IE_Released, this, &AShooterCharacter::DropButtonReleased);
+	PlayerInputComponent->BindAction("Reload", IE_Pressed, this, &AShooterCharacter::ReloadButtonPressed);
 }
 
 float AShooterCharacter::GetCrosshairSpreadMultiplier() const
@@ -611,6 +705,11 @@ FVector AShooterCharacter::GetPickupInterpTargetLocation()
 
 void AShooterCharacter::PickupItem(AItem* Item)
 {
+	if(Item -> GetEquipSound())
+	{
+		UGameplayStatics::PlaySound2D(this, Item -> GetEquipSound());
+	}
+	
 	auto Weapon = Cast<AWeapon>(Item);
 	if(Weapon)
 	{

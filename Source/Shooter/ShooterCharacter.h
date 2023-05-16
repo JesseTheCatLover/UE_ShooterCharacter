@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "AmmoType.h"
 #include "ShooterCharacter.generated.h"
 
 UENUM(BlueprintType)
@@ -14,15 +15,6 @@ enum class ECombatState : uint8
 	ECS_Reloading UMETA(DisplayName = "Reloading"),
 
 	ECS_Max UMETA(Display = "DefaultMax")
-};
-
-UENUM(BlueprintType)
-enum class EAmmoType : uint8
-{
-	EAT_9mm UMETA(DisplayName = "9mm"),
-	EAT_AR UMETA(DisplayName = "Assualt Riffle"),
-
-	EAT_Max UMETA(DisplayName = "DefaultMax")
 };
 
 UCLASS()
@@ -147,6 +139,23 @@ protected:
 	/** Play HipFire montage animation */
 	void PlayHipFireMontage();
 	
+	void ReloadButtonPressed();
+
+	/** Handle reloading the weapon */
+	void ReloadWeapon();
+
+	UFUNCTION(BlueprintCallable)
+	void FinishReloading();
+
+	/** Return true if the character is carrying the type of ammo matching to EquippedWeapon's */
+	bool CarryingAmmo();
+	
+	UFUNCTION(BlueprintCallable)
+	void GrabClip();
+
+	UFUNCTION(BlueprintCallable)
+	void ReleaseClip();
+
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
@@ -330,6 +339,18 @@ private:
 	/** State of Character's combat */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Combat, meta = (AllowPrivateAccess = "true"))
 	ECombatState CombatState;
+
+	/** Montage for reloading the weapon */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Combat , meta = (AllowPrivateAccess = "true"))
+	UAnimMontage* ReloadMontage;
+
+	/** Transform of the clip when hand touches the clip for the first time */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Combat , meta = (AllowPrivateAccess = "true"))
+	FTransform ClipTransform;
+
+	/** Scene component to keep track of hand location with initial offset from the clip */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Combat , meta = (AllowPrivateAccess = "true"))
+	USceneComponent* ClipSceneComponent;
 	
 public:
 	/** Returns CameraBoom subObject */

@@ -139,6 +139,14 @@ private:
 	/** The curve asset to use for item's scale when interpolating (optional) */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item Properties", meta = (AllowPrivateAccess = "true"))
 	UCurveFloat* ItemScaleCurve;
+
+	/** Sound to play when picking item */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Properties", meta = (AllowPrivateAccess = "true"))
+	class USoundCue* PickupSound;
+
+	/** Sound to play when equipping item */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Properties", meta = (AllowPrivateAccess = "true"))
+	USoundCue* EquipSound;
 	
 public:	
 	FORCEINLINE UWidgetComponent* GetPickupWidget() const { return PickupWidget; }
@@ -146,6 +154,8 @@ public:
 	FORCEINLINE USphereComponent* GetAreaSphere() const { return AreaSphere; }
 	FORCEINLINE EItemState GetItemState() const { return ItemState; }
 	FORCEINLINE USkeletalMeshComponent* GetItemMesh() const { return ItemMesh; }
+	FORCEINLINE USoundCue* GetPickupSound() const { return PickupSound; }
+	FORCEINLINE USoundCue* GetEquipSound() const { return EquipSound; }
 	
 	/** Set new state for ItemState and calls UpdateItemProperties() */
 	void SetItemState(EItemState State);
