@@ -39,7 +39,7 @@ private:
 	int32 Ammo;
 
 	/** Maximum amount of ammo the weapon can hold */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon Properties", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Properties", meta = (AllowPrivateAccess = "true"))
 	int32 MagazineCapacity;
 
 	/** Type of weapon */
@@ -51,7 +51,7 @@ private:
 	EAmmoType AmmoType;
 
 	/** Name of the ReloadMontage's section */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Properties", meta = (AllowPrivateAccess = "ture"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon Properties", meta = (AllowPrivateAccess = "ture"))
 	FName ReloadMontageSection;
 
 	/** True when moving the clip while reloading */
@@ -59,7 +59,7 @@ private:
 	bool bMovingClip;
 
 	/** Name for the clip bone */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Properties", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon Properties", meta = (AllowPrivateAccess = "true"))
 	FName ClipBoneName;
 
 public:
@@ -77,6 +77,8 @@ public:
 	FORCEINLINE FName GetClipBoneName() const { return ClipBoneName; }
 
 	void ReloadAmmo(int32 Amount);
+
+	FORCEINLINE bool ClipIsFull() const { return Ammo >= MagazineCapacity; }
 
 	FORCEINLINE void SetMovingClip(bool Moving) { bMovingClip = Moving; }
 };

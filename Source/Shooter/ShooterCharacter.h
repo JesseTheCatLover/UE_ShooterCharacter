@@ -14,7 +14,7 @@ enum class ECombatState : uint8
 	ECS_FireRateTimerInProgress UMETA(DisplayName = "FireRateTimerInProgress"),
 	ECS_Reloading UMETA(DisplayName = "Reloading"),
 
-	ECS_Max UMETA(Display = "DefaultMax")
+	ECS_Max UMETA(DisplayName = "DefaultMax")
 };
 
 UCLASS()
@@ -30,7 +30,10 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-	/** Called for forwards/backwards input */
+	/** Update character properties */
+	void UpdateProperties();
+	
+	/** Called for forward/backward input */
 	void MoveForward(float Value);
 
 	/** Called for side to side input */
@@ -82,7 +85,7 @@ protected:
 	bool LineTraceFromGunBarrel(const FVector& MuzzleSocketLocation, FVector& OutBeamLocation);
 
 	/** Calculate camera interpolation zoom */
-	void CameraInterpZoom(float DeltaTime);
+	void HandleCameraInterpZoom(float DeltaTime);
 
 	/** Set BaseTurnRate and BaseLookUpRate based on aiming state */
 	void SetLookRates();
@@ -156,6 +159,27 @@ protected:
 	UFUNCTION(BlueprintCallable)
 	void ReleaseClip();
 
+	void CrouchingButtonPressed();
+
+	UFUNCTION(BlueprintCallable)
+	void StartCrouchToggle();
+
+	UFUNCTION(BlueprintCallable)
+	void FinishCrouchToggle();
+
+	/** Handle interpolation for CapsuleHalfHeight */
+	void HandleHalfHeightInterp(float DeltaTime);
+	
+	virtual void Jump() override;
+
+	/** Called when LandStart animation notify gets triggered */
+	UFUNCTION(BlueprintCallable)
+	void StartLanding();
+	
+	/** Called when LandFinish animation notify gets triggered */
+	UFUNCTION(BlueprintCallable)
+	void FinishLanding();
+
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
@@ -171,6 +195,10 @@ private:
 	/** Camera that follows the character */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	class UCameraComponent* FollowCamera;
+
+	/** Current speed of the character in X and Y direction */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Properties, meta = (AllowPrivateAccess = "true"))
+	float CurrentSpeed;
 
 	/** Base turn rate in deg/sec. Other scaling may affect fina turn rate */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
@@ -240,9 +268,11 @@ private:
 	UPROPERTY(BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	bool bAiming;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	/** Default camera field of view value */
 	float CameraDefaultFOV;
-	
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	/** Field of view value when the camera is zoomed in */
 	float CameraZoomedFOV;
 
@@ -273,6 +303,9 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Crosshairs, meta = (AllowPrivateAccess = "true"))
 	float CrosshairShootingFactor;
 
+	/** True when aiming button is pressed */
+	bool bAimingButtonPressed;
+	
 	/** Right mouse button or right console trigger pressed */
 	bool bFireButtonPressed;
 
@@ -352,12 +385,62 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Combat , meta = (AllowPrivateAccess = "true"))
 	USceneComponent* ClipSceneComponent;
 	
+	/** True when crouching */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
+	bool bCrouching;
+
+	/** True while toggling between crouch/stand */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
+	bool bCrouchToggling;
+
+	/** Amount of speed for the character while standing (cm/s) */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
+	float HipMovementSpeed;
+
+	/** Amount of speed for the character while aiming (cm/s) */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
+	float AimingMovmentSpeed;
+
+	/** Amount of speed for the character while crouching (cm/s) */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
+	float CrouchMovementSpeed;
+
+	/** Value of CapsuleHalfHeight while standing */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
+	float HipCapsuleHalfHeight;
+
+	/** Value of CapsuleHalfHeight while crouching */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
+	float CrouchCapsuleHalfHeight;
+
+	/** Value of CapsuleHalfHeight while crouching walking */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
+	float CrouchWalkingCapsuleHalfHeight;
+
+	/** Amount of speed for half height interpolation */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
+	float CapsuleHalfHeightInterpSpeed;
+
+	/** True when recovering from landing */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
+	bool bLandRecovering;
+	
+	/** Amount of extra velocity for the character while jumping (cm/s) */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
+	float JumpBoostVelocity;
+
+	/** Amount of speed for the character while recovering from landing (cm/s) */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
+	float LandingRecoveryMovementSpeed;
+	
 public:
 	/** Returns CameraBoom subObject */
 	FORCEINLINE USpringArmComponent *GetCameraBoom() const { return CameraBoom; }
 	/** Returns FollowCamera subObject */
 	FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
-
+	/** Returns current speed of the character in X and Y direction */
+	FORCEINLINE float GetCurrentSpeed() const { return CurrentSpeed; }
+	
 	FORCEINLINE bool GetAiming() const { return bAiming; }
 
 	/** Returns CrosshairSpreadingMultiplier function */
@@ -366,12 +449,18 @@ public:
 	
 	FORCEINLINE int8 GetOverlappedItemCount() const { return OverlappedItemCount; }
 
+	FORCEINLINE ECombatState GetCombatState() const { return CombatState; }
+
+	FORCEINLINE bool GetCrouching() const { return bCrouching; }
+
+	FORCEINLINE bool GetbFireButtonPressed() const { return bFireButtonPressed; }
+
 	/** Adds/subtracts OverlappedItemCount and updates bShouldTraceForItems  */
 	void IncrementOverlappedItemCount(int8 Value);
 
 	/** Get the desired location for Item pick up interpolation */
 	FVector GetPickupInterpTargetLocation();
-
+	
 	/** Set an item to pickup
 	 * @param Item Item to pick up
 	 */
