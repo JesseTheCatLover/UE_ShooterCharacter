@@ -8,6 +8,8 @@
 #include "Components/WidgetComponent.h"
 #include "Components/SphereComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundCue.h"
 
 // Sets default values
 AItem::AItem():
@@ -20,7 +22,10 @@ AItem::AItem():
 	ItemInterpCameraTargetLocation(FVector(0.f)),
 	bInterping(false),
 	CurveDuration(0.7f),
-	InterpInitialYawOffset(0.f)
+	InterpInitialYawOffset(0.f),
+	ItemType(EItemType::EIT_Weapon),
+	InterpLocationIndex(0),
+	InterpSizeScale(1.f)
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
@@ -162,14 +167,21 @@ void AItem::UpdateItemProperties(EItemState State)
 	}
 }
 
-void AItem::StartAnimCurves(AShooterCharacter* Char)
+void AItem::StartPickingItem(AShooterCharacter* Char)
 {
 	Character = Char; // Store a handle to the Character that picked the item
+
+	InterpLocationIndex = Character -> GetInterpLocationIndex();
+	// Add 1 to the ItemCount for this interpolation struct 
+	Character -> IncrementInterpLocItemCount(InterpLocationIndex, 1);
+	
+	PlayPickupSound();
+	
 	ItemInterpStartLocation = GetActorLocation();
 	bInterping = true;
 	SetItemState(EItemState::EIS_EquipInterp);
 	
-	GetWorldTimerManager().SetTimer(CurveTimer, this, &AItem::FinishAnimCurves, CurveDuration);
+	GetWorldTimerManager().SetTimer(CurveTimer, this, &AItem::FinishInterping, CurveDuration);
 
 	const float CameraYaw = Character -> GetCameraBoom() -> GetComponentRotation().Yaw;
 	const float ItemYaw = GetActorRotation().Yaw;
@@ -178,12 +190,14 @@ void AItem::StartAnimCurves(AShooterCharacter* Char)
 	InterpInitialYawOffset = ItemYaw - CameraYaw;
 }
 
-void AItem::FinishAnimCurves()
+void AItem::FinishInterping()
 {
 	bInterping = false;
 	if(Character)
 	{
 		Character -> PickupItem(this);
+		// Subtract 1 from the ItemCount of this InterpLocation struct
+		Character -> IncrementInterpLocItemCount(InterpLocationIndex, -1);
 	}
 	if(ItemScaleCurve) SetActorScale3D(FVector(1.f)); // Set scale back to normal
 }
@@ -198,8 +212,9 @@ void AItem::PickupInterpHandler(float DeltaTime)
 		const float ZCurveValue = ItemZCurve -> GetFloatValue(ElapsedTime);
 
 		FVector ItemCurrentLocation = ItemInterpStartLocation;
-		const FVector TargetInterpLocation{ Character -> GetPickupInterpTargetLocation() };
-
+		FVector TargetInterpLocation{FVector(0.f)};
+		if(!GetPickupInterpTargetLocation(TargetInterpLocation)) return;
+		
 		// Vector from item to camera, X and Y are zeroed out 
 		const FVector ItemToCameraDeltaZ{ FVector(0.f, 0.f, (TargetInterpLocation - ItemCurrentLocation).Z ) };
 		// Scale factor to multiply with the CurveValue
@@ -229,7 +244,38 @@ void AItem::PickupInterpHandler(float DeltaTime)
 		if(ItemScaleCurve) // Applying a ScaleCurve is optional
 		{
 			const float ScaleCurveValue = ItemScaleCurve -> GetFloatValue(ElapsedTime);
-			SetActorScale3D(FVector(ScaleCurveValue));
+			SetActorScale3D(FVector(ScaleCurveValue) * FVector(InterpSizeScale));
+		}
+	}
+}
+
+bool AItem::GetPickupInterpTargetLocation(FVector &Location)
+{
+	if(Character == nullptr) return false;
+
+	switch(ItemType)
+	{
+	case EItemType::EIT_Weapon:
+		Location = Character -> GetInterpLocation(0).SceneComponent -> GetComponentLocation();
+		return true;
+	case EItemType::EIT_Ammo:
+		Location = Character -> GetInterpLocation(InterpLocationIndex).SceneComponent -> GetComponentLocation();
+		return true;
+	case EItemType::EIT_Max: break;
+	}
+	return false;
+}
+
+void AItem::PlayPickupSound() const
+{
+	if(Character)
+	{
+		if(Character -> GetShouldPickupSound())
+		{
+			if(PickupSound)
+			{
+				UGameplayStatics::PlaySound2D(this, PickupSound);
+			}
 		}
 	}
 }
@@ -247,4 +293,18 @@ void AItem::SetItemState(EItemState State)
 {
 	ItemState = State;
 	UpdateItemProperties(State);
+}
+
+void AItem::PlayEquipSound() const
+{
+	if(Character)
+	{
+		if(Character -> GetShouldEquipSound())
+		{
+			if(EquipSound)
+			{
+				UGameplayStatics::PlaySound2D(this, EquipSound);
+			}
+		}
+	}
 }

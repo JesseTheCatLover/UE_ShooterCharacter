@@ -30,6 +30,15 @@ enum class EItemState : uint8
 	EIS_Max UMETA(DisplayName = "DefaultMax")
 };
 
+UENUM(BlueprintType)
+enum class EItemType : uint8
+{
+	EIT_Weapon UMETA(DisplayName = "Weapon"),
+	EIT_Ammo UMETA(DisplayName = "Ammo"),
+
+	EIT_Max UMETA(DisplayName" DefaultMax")
+};
+
 UCLASS()
 class SHOOTER_API AItem : public AActor
 {
@@ -56,14 +65,19 @@ protected:
 	/** Set the ActiveStars array of bools based on the rarity */
 	void SetActiveStars();
 
-	/** Set properties for Item's components based on State */
-	void UpdateItemProperties(EItemState State);
+	/** Set properties for Item's components based on the State */
+	virtual void UpdateItemProperties(EItemState State);
 
-	/** Called when Curves are finished */
-	void FinishAnimCurves();
+	/** Called when item interpolation is finished */
+	void FinishInterping();
 
 	/** Handle item pickup interpolation when (bInterping = true) */
 	void PickupInterpHandler(float DeltaTime);
+
+	/** Get the desired location for Item pick up interpolation */
+	bool GetPickupInterpTargetLocation(FVector &Location);
+
+	void PlayPickupSound() const;
 	
 public:	
 	// Called every frame
@@ -147,11 +161,23 @@ private:
 	/** Sound to play when equipping item */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Properties", meta = (AllowPrivateAccess = "true"))
 	USoundCue* EquipSound;
+
+	/** Type of the Item */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "ItemProperties", meta = (AllowPrivateAccess = "true"))
+	EItemType ItemType;
+
+	/** Index of the interp location this item is currently interping to */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ItemProperties", meta = (AllowPrivateAccess = "true"))
+	int32 InterpLocationIndex;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+	float InterpSizeScale;
 	
 public:	
 	FORCEINLINE UWidgetComponent* GetPickupWidget() const { return PickupWidget; }
 	FORCEINLINE UBoxComponent* GetCollisionBox() const { return CollisionBox; }
 	FORCEINLINE USphereComponent* GetAreaSphere() const { return AreaSphere; }
+	FORCEINLINE int32 GetItemCount() const { return ItemCount; }
 	FORCEINLINE EItemState GetItemState() const { return ItemState; }
 	FORCEINLINE USkeletalMeshComponent* GetItemMesh() const { return ItemMesh; }
 	FORCEINLINE USoundCue* GetPickupSound() const { return PickupSound; }
@@ -163,5 +189,7 @@ public:
 	/** Play CurveTimer and call PickupInterpHandler() every frame
 	 *	to handle pickup interpolation based on the curve values
 	 *	@param Char This is a pointer to the player who is picking up the item */
-	void StartAnimCurves(AShooterCharacter* Char);
+	void StartPickingItem(AShooterCharacter* Char);
+
+	void PlayEquipSound() const;
 };

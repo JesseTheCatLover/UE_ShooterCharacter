@@ -17,6 +17,20 @@ enum class ECombatState : uint8
 	ECS_Max UMETA(DisplayName = "DefaultMax")
 };
 
+USTRUCT(BlueprintType)
+struct FInterpLocation
+{
+	GENERATED_BODY();
+
+	// Scene component to use for its location for interpolation
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	USceneComponent* SceneComponent;
+
+	// Number of items interping to/at this SceneComponent location
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	int32 ItemCount;
+};
+
 UCLASS()
 class SHOOTER_API AShooterCharacter : public ACharacter
 {
@@ -75,14 +89,14 @@ protected:
 	void AimingButtonReleased();
 
 	/** Perform a line trace from crosshair screen location outward */
-	bool LineTraceFromCrosshair(FHitResult &OutHitResult);
+	bool LineTraceFromCrosshair(FHitResult &OutHitResult) const;
 
 	/** Perform a second line trace from gun barrel to where the beam ends and mix the two trace together
 	 *  and get the end location vector
 	 *  @param MuzzleSocketLocation The location of gun barrel tip and where Muzzle particle spawns
 	 *  @param OutBeamLocation Give out the location of where beam trace ends
 	 */
-	bool LineTraceFromGunBarrel(const FVector& MuzzleSocketLocation, FVector& OutBeamLocation);
+	bool LineTraceFromGunBarrel(const FVector& MuzzleSocketLocation, FVector& OutBeamLocation) const;
 
 	/** Calculate camera interpolation zoom */
 	void HandleCameraInterpZoom(float DeltaTime);
@@ -110,7 +124,7 @@ protected:
 	void PickupTrace();
 
 	/** Spawn default Weapon for the character */
-	class AWeapon* SpawnDefaultWeapon();
+	class AWeapon* SpawnDefaultWeapon() const;
 
 	/** Attach Weapon to HandSocket and apply appropriate properties */
 	void EquipWeapon(AWeapon* WeaponToEquip);
@@ -131,16 +145,16 @@ protected:
 	void InitializeAmmoMap();
 
 	/** Return true if EquippedWeapon has ammo */
-	bool WeaponHasAmmo();
+	bool WeaponHasAmmo() const;
 
 	/** Play firing sound */
-	void PlayFireSound();
+	void PlayFireSound() const;
 
 	/** Perform linetrace for shooting and gathering information */
-	void SendBullet();
+	void SendBullet() const;
 
 	/** Play HipFire montage animation */
-	void PlayHipFireMontage();
+	void PlayHipFireMontage() const;
 	
 	void ReloadButtonPressed();
 
@@ -157,7 +171,7 @@ protected:
 	void GrabClip();
 
 	UFUNCTION(BlueprintCallable)
-	void ReleaseClip();
+	void ReleaseClip() const;
 
 	void CrouchingButtonPressed();
 
@@ -168,7 +182,7 @@ protected:
 	void FinishCrouchToggle();
 
 	/** Handle interpolation for CapsuleHalfHeight */
-	void HandleHalfHeightInterp(float DeltaTime);
+	void HandleHalfHeightInterp(float DeltaTime) const;
 	
 	virtual void Jump() override;
 
@@ -179,6 +193,12 @@ protected:
 	/** Called when LandFinish animation notify gets triggered */
 	UFUNCTION(BlueprintCallable)
 	void FinishLanding();
+
+	/** Add the ammo item to the inventory and consume it */
+	void PickupAmmo(class AAmmo* Ammo);
+
+	/** Create FInterpLocation structs for each location, and add them to the array */
+	void InitializeInterpLocations();
 
 public:	
 	// Called every frame
@@ -349,14 +369,6 @@ private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Combat , meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<AWeapon> DefaultWeaponClass;
 
-	/** Distance of desired location for Item pickup interpolation from the camera */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Combat, meta = (AllowPrivateAccess = "true"))
-	float CameraPickupInterpDistance;
-
-	/** Elevation of desired location for Item pickup interpolation from the camera */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Combat, meta = (AllowPrivateAccess = "true"))
-	float CameraPickupInterpElevation;
-
 	/** Map to keep track of ammo of different ammo types */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Combat, meta = (AllowPrivateAccess = "true"))
 	TMap<EAmmoType, int32> AmmoMap;
@@ -399,7 +411,7 @@ private:
 
 	/** Amount of speed for the character while aiming (cm/s) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
-	float AimingMovmentSpeed;
+	float AimingMovementSpeed;
 
 	/** Amount of speed for the character while crouching (cm/s) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
@@ -432,6 +444,45 @@ private:
 	/** Amount of speed for the character while recovering from landing (cm/s) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
 	float LandingRecoveryMovementSpeed;
+
+	/** Location of the weapon when hovered over the camera during interpolation */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+	USceneComponent* WeaponInterpComp;
+
+	// Location of the item(s) when hovered over the camera during interpolation
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+	USceneComponent* InterpComp1;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+	USceneComponent* InterpComp2;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+	USceneComponent* InterpComp3;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+	USceneComponent* InterpComp4;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+	USceneComponent* InterpComp5;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+	USceneComponent* InterpComp6;
+
+	/** Array of interp location structs */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+	TArray<FInterpLocation> InterpLocations;
+
+	FTimerHandle PickupSoundTimer;
+	FTimerHandle EquipSoundTimer;
+
+	bool bShouldPlayPickupSound;
+	bool bShouldPlayEquipSound;
+
+	void RestPickupSoundTimer();
+	void ResetEquipSoundTimer();
+
+	/** Amount of time between each pickup sound */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Items, meta = (AllowPrivateAccess = "true"))
+	float PickupSoundTimerDuration;
+
+	/** Amount of time between each equip sound */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Items, meta = (AllowPrivateAccess = "true"))
+	float EquipSoundTimerDuration;
 	
 public:
 	/** Returns CameraBoom subObject */
@@ -453,16 +504,29 @@ public:
 
 	FORCEINLINE bool GetCrouching() const { return bCrouching; }
 
-	FORCEINLINE bool GetbFireButtonPressed() const { return bFireButtonPressed; }
+	FORCEINLINE bool GetFireButtonPressed() const { return bFireButtonPressed; }
 
-	/** Adds/subtracts OverlappedItemCount and updates bShouldTraceForItems  */
+	FORCEINLINE bool GetShouldPickupSound() const { return bShouldPlayPickupSound; }
+
+	FORCEINLINE bool GetShouldEquipSound() const { return bShouldPlayEquipSound; };
+
+	/** Add/subtract OverlappedItemCount and updates bShouldTraceForItems */
 	void IncrementOverlappedItemCount(int8 Value);
 
-	/** Get the desired location for Item pick up interpolation */
-	FVector GetPickupInterpTargetLocation();
+	/** Get the desired interp location based on an Index in the array */
+	FInterpLocation GetInterpLocation(int32 Index);
+
+	/** Get the index of an InterpLocation with the lowest ItemCount */
+	int32 GetInterpLocationIndex();
+
+	/** Add/subtract ItemCount from desired InterpLocation */
+	void IncrementInterpLocItemCount(int32 Index, int32 Amount);
 	
 	/** Set an item to pickup
 	 * @param Item Item to pick up
 	 */
 	void PickupItem(AItem* Item);
+
+	void StartPickupSoundTimer();
+	void StartEquipSoundTimer();
 };

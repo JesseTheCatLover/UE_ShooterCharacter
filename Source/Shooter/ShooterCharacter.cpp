@@ -2,6 +2,7 @@
 
 #include "ShooterCharacter.h"
 
+#include "Ammo.h"
 #include "Item.h"
 #include "Weapon.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -54,9 +55,6 @@ AShooterCharacter::AShooterCharacter():
 	// Item trace variables
 	bShouldTraceForItems(false),
 	OverlappedItemCount(0),
-	// Camera pickup interpolation variables
-	CameraPickupInterpDistance(250.f),
-	CameraPickupInterpElevation(65.f),
 	// Starting ammo amounts
 	Starting9mmAmmo(80),
 	StartingARAmmo(120),
@@ -66,7 +64,7 @@ AShooterCharacter::AShooterCharacter():
 	bCrouching(false),
 	bCrouchToggling(false),
 	HipMovementSpeed(600.f),
-	AimingMovmentSpeed(400.f),
+	AimingMovementSpeed(400.f),
 	CrouchMovementSpeed(280.f),
 	HipCapsuleHalfHeight(88.f),
 	CrouchCapsuleHalfHeight(46.f),
@@ -75,7 +73,12 @@ AShooterCharacter::AShooterCharacter():
 	// Jumping
 	bLandRecovering(false),
 	JumpBoostVelocity(500.f),
-	LandingRecoveryMovementSpeed(570.f)
+	LandingRecoveryMovementSpeed(570.f),
+	// Pickup/Equip sound timer
+	bShouldPlayPickupSound(true),
+	bShouldPlayEquipSound(true),
+	PickupSoundTimerDuration(0.2f),
+	EquipSoundTimerDuration(0.2f)
 {
 	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
@@ -106,6 +109,24 @@ AShooterCharacter::AShooterCharacter():
 
 	// Create a ClipSceneComponent
 	ClipSceneComponent = CreateDefaultSubobject<USceneComponent>(TEXT("ClipSceneComponent"));
+	ClipSceneComponent -> SetupAttachment(GetMesh());
+
+	WeaponInterpComp = CreateDefaultSubobject<USceneComponent>(TEXT("WeaponInterpolationComponent"));
+	WeaponInterpComp -> SetupAttachment(GetFollowCamera());
+	
+	InterpComp1 = CreateDefaultSubobject<USceneComponent>(TEXT("Interpolation Component 1"));
+	InterpComp1 -> SetupAttachment(GetFollowCamera());
+	InterpComp2 = CreateDefaultSubobject<USceneComponent>(TEXT("Interpolation Component 2"));
+	InterpComp2 -> SetupAttachment(GetFollowCamera());
+	InterpComp3 = CreateDefaultSubobject<USceneComponent>(TEXT("Interpolation Component 3"));
+	InterpComp3 -> SetupAttachment(GetFollowCamera());
+	InterpComp4 = CreateDefaultSubobject<USceneComponent>(TEXT("Interpolation Component 4"));
+	InterpComp4 -> SetupAttachment(GetFollowCamera());
+	InterpComp5 = CreateDefaultSubobject<USceneComponent>(TEXT("Interpolation Component 5"));
+	InterpComp5 -> SetupAttachment(GetFollowCamera());
+	InterpComp6 = CreateDefaultSubobject<USceneComponent>(TEXT("Interpolation Component 6"));
+	InterpComp6 -> SetupAttachment(GetFollowCamera());
+	
 }
 
 void AShooterCharacter::BeginPlay()
@@ -121,6 +142,8 @@ void AShooterCharacter::BeginPlay()
 	EquipWeapon(SpawnDefaultWeapon());
 	// Initialize AmmoMap with starting values
 	InitializeAmmoMap();
+	// Initialize InterpLocations for item picking interping
+	InitializeInterpLocations();
 }
 
 void AShooterCharacter::UpdateProperties()
@@ -135,10 +158,10 @@ void AShooterCharacter::MoveForward(float Value)
 	if((Controller != nullptr) && (Value != 0.0f))
 	{
 		// find out which way is forward
-		FRotator Rotation{ Controller -> GetControlRotation() };
-		FRotator YawRotation{ 0, Rotation.Yaw, 0 };
+		const FRotator Rotation{ Controller -> GetControlRotation() };
+		const FRotator YawRotation{ 0, Rotation.Yaw, 0 };
 
-		FVector Direction{ FRotationMatrix{YawRotation}.GetUnitAxis(EAxis::X) };
+		const FVector Direction{ FRotationMatrix{YawRotation}.GetUnitAxis(EAxis::X) };
 		AddMovementInput(Direction, Value);
 	}
 }
@@ -148,10 +171,10 @@ void AShooterCharacter::MoveRight(float Value)
 	if((Controller != nullptr) && (Value != 0.0f))
 	{
 		// find out which way is right
-		FRotator Rotation{ Controller -> GetControlRotation() };
-		FRotator YawRotation{ 0, Rotation.Yaw, 0 };
+		const FRotator Rotation{ Controller -> GetControlRotation() };
+		const FRotator YawRotation{ 0, Rotation.Yaw, 0 };
 
-		FVector Direction{ FRotationMatrix{ YawRotation }.GetUnitAxis(EAxis::Y) };
+		const FVector Direction{ FRotationMatrix{ YawRotation }.GetUnitAxis(EAxis::Y) };
 		AddMovementInput(Direction, Value);
 	}
 }
@@ -204,7 +227,7 @@ void AShooterCharacter::FireWeapon()
 	}
 }
 
-bool AShooterCharacter::LineTraceFromCrosshair(FHitResult &OutHitResult)
+bool AShooterCharacter::LineTraceFromCrosshair(FHitResult &OutHitResult) const
 {
 	// Get current size of the viewport
 	FVector2D ViewportSize;
@@ -220,7 +243,7 @@ bool AShooterCharacter::LineTraceFromCrosshair(FHitResult &OutHitResult)
 	FVector CrosshairWorldDirection;
 
 	// Get world position and direction of crosshair
-	bool bScreenToWorld = UGameplayStatics::DeprojectScreenToWorld
+	const bool bScreenToWorld = UGameplayStatics::DeprojectScreenToWorld
 	(UGameplayStatics::GetPlayerController(this, 0),
 	 CrosshairLocation, CrosshairWorldPosition, CrosshairWorldDirection);
 
@@ -238,7 +261,7 @@ bool AShooterCharacter::LineTraceFromCrosshair(FHitResult &OutHitResult)
 	return false;
 }
 
-bool AShooterCharacter::LineTraceFromGunBarrel(const FVector& MuzzleSocketLocation, FVector& OutBeamLocation)
+bool AShooterCharacter::LineTraceFromGunBarrel(const FVector& MuzzleSocketLocation, FVector& OutBeamLocation) const
 {
 	FHitResult CrosshairHitResult;
 	LineTraceFromCrosshair(CrosshairHitResult);
@@ -283,7 +306,7 @@ void AShooterCharacter::AimingButtonPressed()
 	if(EquippedWeapon && CombatState != ECombatState::ECS_Reloading) // We can only aim when holding a Weapon
 	{
 		bAiming = true;
-		if(!bCrouching) GetCharacterMovement() -> MaxWalkSpeed = AimingMovmentSpeed;
+		if(!bCrouching) GetCharacterMovement() -> MaxWalkSpeed = AimingMovementSpeed;
 	}
 }
 
@@ -298,11 +321,7 @@ void AShooterCharacter::SelectButtonPressed()
 {
 	if(PickupTraceHitItem)
 	{
-		PickupTraceHitItem -> StartAnimCurves(this);
-		if(PickupTraceHitItem -> GetPickupSound())
-		{
-			UGameplayStatics::PlaySound2D(this, PickupTraceHitItem -> GetPickupSound());
-		}
+		PickupTraceHitItem -> StartPickingItem(this);
 
 		PickupTraceHitItem = nullptr;
 		PreviousPickupTraceHitItem = nullptr;
@@ -356,8 +375,8 @@ void AShooterCharacter::SetLookRates()
 
 void AShooterCharacter::CalculateCrosshairSpread(float DeltaTime)
 {
-	FVector2D WalkingSpeedRange { 0.f , 600.f };
-	FVector2D VelocityMultiplierRange { 0.f, 1.f };
+	const FVector2D WalkingSpeedRange { 0.f , 600.f };
+	const FVector2D VelocityMultiplierRange { 0.f, 1.f };
 	FVector Velocity { GetVelocity() };
 	Velocity.Z = 0;
 
@@ -448,7 +467,7 @@ void AShooterCharacter::PickupTrace()
 			PickupTraceHitItem = Cast<AItem>(ItemTraceResult.GetActor());
 			if(PickupTraceHitItem && PickupTraceHitItem -> GetPickupWidget())
 			{
-				// Show Item pickup widget
+				// Show Item pickup widget 
 				PickupTraceHitItem -> GetPickupWidget() -> SetVisibility(true);
 			}
 
@@ -471,7 +490,7 @@ void AShooterCharacter::PickupTrace()
 	}
 }
 
-AWeapon* AShooterCharacter::SpawnDefaultWeapon()
+AWeapon* AShooterCharacter::SpawnDefaultWeapon() const
 {
 	if(DefaultWeaponClass)
 	{
@@ -499,7 +518,7 @@ void AShooterCharacter::DropWeapon()
 {
 	if(EquippedWeapon)
 	{
-		FDetachmentTransformRules DetachmentTransformRule(EDetachmentRule::KeepWorld, true);
+		const FDetachmentTransformRules DetachmentTransformRule(EDetachmentRule::KeepWorld, true);
 		EquippedWeapon -> GetItemMesh() -> DetachFromComponent(DetachmentTransformRule);
 		
 		EquippedWeapon -> SetItemState(EItemState::EIS_Falling);
@@ -520,13 +539,13 @@ void AShooterCharacter::InitializeAmmoMap()
 	AmmoMap.Add(EAmmoType::EAT_AR, StartingARAmmo);	
 }
 
-bool AShooterCharacter::WeaponHasAmmo()
+bool AShooterCharacter::WeaponHasAmmo() const
 {
 	if(EquippedWeapon == nullptr) return false; // If we aren't holding a weapon
 	return EquippedWeapon -> GetAmmo() > 0;
 }
 
-void AShooterCharacter::PlayFireSound()
+void AShooterCharacter::PlayFireSound() const
 {
 	if(FireSound)
 	{
@@ -534,7 +553,7 @@ void AShooterCharacter::PlayFireSound()
 	}
 }
 
-void AShooterCharacter::SendBullet()
+void AShooterCharacter::SendBullet() const
 {
 	const USkeletalMeshSocket* BarrelSocket = EquippedWeapon -> GetItemMesh() -> GetSocketByName("BarrelSocket");
 	if(BarrelSocket)
@@ -567,7 +586,7 @@ void AShooterCharacter::SendBullet()
 	}
 }
 
-void AShooterCharacter::PlayHipFireMontage()
+void AShooterCharacter::PlayHipFireMontage() const
 {
 	UAnimInstance* AnimInstance = GetMesh() -> GetAnimInstance();
 	if(AnimInstance && HipFireMontage)
@@ -634,7 +653,7 @@ bool AShooterCharacter::CarryingAmmo()
 {
 	if(EquippedWeapon == nullptr) return false;
 
-	auto AmmoType = EquippedWeapon -> GetAmmoType();
+	const auto AmmoType = EquippedWeapon -> GetAmmoType();
 	if(AmmoMap.Contains(AmmoType))
 	{
 		return AmmoMap[AmmoType] > 0;
@@ -658,7 +677,7 @@ void AShooterCharacter::GrabClip()
 	EquippedWeapon -> SetMovingClip(true);
 }
 
-void AShooterCharacter::ReleaseClip()
+void AShooterCharacter::ReleaseClip() const
 {
 	if(EquippedWeapon == nullptr) return;
 
@@ -667,7 +686,7 @@ void AShooterCharacter::ReleaseClip()
 
 void AShooterCharacter::CrouchingButtonPressed()
 {
-	if(!GetCharacterMovement() -> IsFalling() && !bCrouchToggling)
+	if(!GetCharacterMovement() -> IsFalling() && !bCrouchToggling && !bLandRecovering)
 	{
 		bCrouching = !bCrouching; // Toggle
 	}
@@ -686,7 +705,7 @@ void AShooterCharacter::FinishCrouchToggle()
 	GetCharacterMovement() -> MaxWalkSpeed = bCrouching ? CrouchMovementSpeed : HipMovementSpeed;
 }
 
-void AShooterCharacter::HandleHalfHeightInterp(float DeltaTime)
+void AShooterCharacter::HandleHalfHeightInterp(float DeltaTime) const
 {
 	const float Target{ bCrouching && CurrentSpeed > 0.f ? CrouchWalkingCapsuleHalfHeight : // not moving
 	bCrouching ? CrouchCapsuleHalfHeight : HipCapsuleHalfHeight };
@@ -720,6 +739,59 @@ void AShooterCharacter::FinishLanding()
 {
 	GetCharacterMovement() -> MaxWalkSpeed = HipMovementSpeed;
 	bLandRecovering = false;
+}
+
+void AShooterCharacter::PickupAmmo(AAmmo* Ammo)
+{
+	const EAmmoType AmmoType{ Ammo -> GetAmmoType() };
+	if(AmmoMap.Contains(AmmoType)) // if the ammo type is registered and valid
+	{
+		int32 AmmoCount{ AmmoMap[AmmoType] };
+		AmmoCount += Ammo -> GetItemCount();
+		AmmoMap[AmmoType] = AmmoCount;
+		Ammo -> Destroy();
+		
+		if(EquippedWeapon == nullptr) return; // If we are holding a weapon
+		// and it is empty and uses the same ammo type, after gathering ammo automatically reload it
+		if(EquippedWeapon -> GetAmmoType() == AmmoType && EquippedWeapon -> GetAmmo() == 0)
+		{
+			ReloadWeapon();
+		}
+	}
+}
+
+void AShooterCharacter::InitializeInterpLocations()
+{
+	const FInterpLocation WeaponLocation{ WeaponInterpComp, 0 };
+	InterpLocations.Add(WeaponLocation);
+
+	const FInterpLocation InterpLoc1{ InterpComp1, 0 };
+	InterpLocations.Add(InterpLoc1);
+
+	const FInterpLocation InterpLoc2{ InterpComp2, 0 };
+	InterpLocations.Add(InterpLoc2);
+
+	const FInterpLocation InterpLoc3{ InterpComp3, 0 };
+	InterpLocations.Add(InterpLoc3);
+
+	const FInterpLocation InterpLoc4{ InterpComp4, 0 };
+	InterpLocations.Add(InterpLoc4);
+
+	const FInterpLocation InterpLoc5{ InterpComp5, 0 };
+	InterpLocations.Add(InterpLoc5);
+
+	const FInterpLocation InterpLoc6{ InterpComp6, 0 };
+	InterpLocations.Add(InterpLoc6);
+}
+
+void AShooterCharacter::RestPickupSoundTimer()
+{
+	bShouldPlayPickupSound = true;	
+}
+
+void AShooterCharacter::ResetEquipSoundTimer()
+{
+	bShouldPlayEquipSound = true;
 }
 
 // Called every frame
@@ -787,25 +859,68 @@ void AShooterCharacter::IncrementOverlappedItemCount(int8 Value)
 	}
 }
 
-FVector AShooterCharacter::GetPickupInterpTargetLocation()
+FInterpLocation AShooterCharacter::GetInterpLocation(int32 Index)
 {
-	const FVector CameraWorldLocation{ FollowCamera -> GetComponentLocation() };
-	const FVector CameraForward{ FollowCamera -> GetForwardVector() };
-	// Desired location = Camera location + (Forward * A) + (Up * B)
-	return CameraWorldLocation + (CameraForward * CameraPickupInterpDistance) + FVector(0.f, 0.f,
-		CameraPickupInterpElevation);
+	if(Index < InterpLocations.Num())
+	{
+		return InterpLocations[Index];
+	}
+	else
+		return FInterpLocation();
+}
+
+int32 AShooterCharacter::GetInterpLocationIndex()
+{
+	int32 LowestIndex = 1, LowestCount = INT_MAX;
+
+	for(int32 i = 1; i < InterpLocations.Num(); i++)
+		if(InterpLocations[i].ItemCount < LowestCount)
+		{
+			LowestIndex = i;
+			LowestCount = InterpLocations[i].ItemCount;
+		}
+	return LowestIndex;
+}
+
+void AShooterCharacter::IncrementInterpLocItemCount(int32 Index, int32 Amount)
+{
+	if(Index < 0 || Amount < -1 || Amount > 1) return;
+	if(InterpLocations.Num() >= Index)
+	{
+		InterpLocations[Index].ItemCount += Amount;
+	}
 }
 
 void AShooterCharacter::PickupItem(AItem* Item)
 {
-	if(Item -> GetEquipSound())
-	{
-		UGameplayStatics::PlaySound2D(this, Item -> GetEquipSound());
-	}
+	Item -> PlayEquipSound();
 	
 	auto Weapon = Cast<AWeapon>(Item);
 	if(Weapon)
 	{
 		SwapWeapon(Weapon);
+		return;
 	}
+
+	auto Ammo = Cast<AAmmo>(Item);
+	if(Ammo)
+	{
+		PickupAmmo(Ammo);
+		return;
+	}
+}
+
+void AShooterCharacter::StartPickupSoundTimer()
+{
+	bShouldPlayPickupSound = false;
+	GetWorld() -> GetTimerManager().SetTimer(PickupSoundTimer, this,
+		&AShooterCharacter::ResetEquipSoundTimer, PickupSoundTimerDuration);
+}
+
+void AShooterCharacter::StartEquipSoundTimer()
+{
+	bShouldPlayEquipSound = false;
+	GetWorld() -> GetTimerManager().SetTimer(EquipSoundTimer, this,
+		&AShooterCharacter::ResetEquipSoundTimer, EquipSoundTimerDuration);
+	
 }

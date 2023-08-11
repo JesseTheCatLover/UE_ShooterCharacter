@@ -62,7 +62,7 @@ void UShooterAnimInstance::UpdateAnimationProperties()
 	// Get properties from character class
 	Speed = ShooterCharacter -> GetCurrentSpeed();
 	bAiming = ShooterCharacter -> GetAiming();
-	bFiring = ShooterCharacter -> GetbFireButtonPressed();
+	bFiring = ShooterCharacter -> GetFireButtonPressed();
 	bCrouching = ShooterCharacter -> GetCrouching();
 	bReloading = ShooterCharacter -> GetCombatState() == ECombatState::ECS_Reloading;
 	bIsInAir = ShooterCharacter -> GetCharacterMovement() -> IsFalling();
