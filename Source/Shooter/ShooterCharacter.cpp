@@ -469,6 +469,7 @@ void AShooterCharacter::PickupTrace()
 			{
 				// Show Item pickup widget 
 				PickupTraceHitItem -> GetPickupWidget() -> SetVisibility(true);
+				PickupTraceHitItem -> EnableCustomDepth();
 			}
 
 			// If linetrace hit an item last frame
@@ -477,6 +478,7 @@ void AShooterCharacter::PickupTrace()
 				if(PickupTraceHitItem != PreviousPickupTraceHitItem) // If linetrace hit a new item this frame
 				{
 					PreviousPickupTraceHitItem -> GetPickupWidget() -> SetVisibility(false);
+					PreviousPickupTraceHitItem -> DisableCustomDepth();
 				}
 			}
 			
@@ -487,6 +489,7 @@ void AShooterCharacter::PickupTrace()
 	else if(PreviousPickupTraceHitItem) // If character no longer overlap items, and the last item isn't null.
 	{
 		PreviousPickupTraceHitItem -> GetPickupWidget() -> SetVisibility(false);
+		PreviousPickupTraceHitItem -> DisableCustomDepth();
 	}
 }
 
@@ -494,7 +497,9 @@ AWeapon* AShooterCharacter::SpawnDefaultWeapon() const
 {
 	if(DefaultWeaponClass)
 	{
-		return GetWorld() -> SpawnActor<AWeapon>(DefaultWeaponClass);
+		const auto Actor = GetWorld() -> SpawnActor<AWeapon>(DefaultWeaponClass);
+		Actor -> DisableGlowMaterial();
+		return Actor;
 	}
 	return nullptr;
 }
@@ -893,6 +898,7 @@ void AShooterCharacter::IncrementInterpLocItemCount(int32 Index, int32 Amount)
 
 void AShooterCharacter::PickupItem(AItem* Item)
 {
+	Item -> SetItemState(EItemState::EIS_PickedUp);
 	Item -> PlayEquipSound();
 	
 	auto Weapon = Cast<AWeapon>(Item);

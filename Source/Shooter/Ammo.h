@@ -42,4 +42,7 @@ private:
 public:
 	FORCEINLINE UStaticMeshComponent* GetAmmoMesh() const { return AmmoMesh; }
 	FORCEINLINE EAmmoType GetAmmoType() const { return AmmoType; }
+
+	virtual void EnableCustomDepth() override;
+	virtual void DisableCustomDepth() override;
 };

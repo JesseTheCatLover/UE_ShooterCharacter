@@ -10,9 +10,11 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundCue.h"
+#include "Curves/CurveVector.h"
 
 // Sets default values
 AItem::AItem():
+	ItemType(EItemType::EIT_Weapon),
 	ItemName(FString("Default")),
 	ItemCount(0),
 	ItemRarity(EItemRarity::EIR_Common),
@@ -21,11 +23,21 @@ AItem::AItem():
 	ItemInterpStartLocation(FVector(0.f)),
 	ItemInterpCameraTargetLocation(FVector(0.f)),
 	bInterping(false),
-	CurveDuration(0.7f),
+	InterpCurveDuration(0.7f),
 	InterpInitialYawOffset(0.f),
-	ItemType(EItemType::EIT_Weapon),
 	InterpLocationIndex(0),
-	InterpSizeScale(1.f)
+	InterpSizeScale(1.f),
+	// Glow material variables
+	bCustomDepthOnBeginPlay(false),
+	GlowMaterialIndex(0),
+	GlowBlendAlphaParameterName(TEXT("GlowBlendAlpha")),
+	GlowAmountParameterName(TEXT("GlowAmount")),
+	FresnelExponentParameterName(TEXT("FresnelExponent")),
+	FresnelReflectFractionParameterName(TEXT("FresnelReflectFraction")),
+	GlowAmount(150.f),
+	FresnelExponent(3.f),
+	FresnelReflectFraction(4.f),
+	GlowPulseDuration(5.f)
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
@@ -64,6 +76,12 @@ void AItem::BeginPlay()
 
 	// Set properties for Item's components based on the state
 	UpdateItemProperties(ItemState);
+
+	// Initialize outline post-process
+	InitializeCustomDepth();
+
+	// Start glowing
+	StartGlowPulseTimer();
 }
 
 void AItem::OnSphereBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp,
@@ -180,8 +198,9 @@ void AItem::StartPickingItem(AShooterCharacter* Char)
 	ItemInterpStartLocation = GetActorLocation();
 	bInterping = true;
 	SetItemState(EItemState::EIS_EquipInterp);
-	
-	GetWorldTimerManager().SetTimer(CurveTimer, this, &AItem::FinishInterping, CurveDuration);
+
+	GetWorldTimerManager().ClearTimer(GlowPulseTimer);
+	GetWorldTimerManager().SetTimer(InterpCurveTimer, this, &AItem::FinishInterping, InterpCurveDuration);
 
 	const float CameraYaw = Character -> GetCameraBoom() -> GetComponentRotation().Yaw;
 	const float ItemYaw = GetActorRotation().Yaw;
@@ -193,6 +212,8 @@ void AItem::StartPickingItem(AShooterCharacter* Char)
 void AItem::FinishInterping()
 {
 	bInterping = false;
+	GetWorldTimerManager().ClearTimer(InterpCurveTimer);
+	
 	if(Character)
 	{
 		Character -> PickupItem(this);
@@ -200,6 +221,9 @@ void AItem::FinishInterping()
 		Character -> IncrementInterpLocItemCount(InterpLocationIndex, -1);
 	}
 	if(ItemScaleCurve) SetActorScale3D(FVector(1.f)); // Set scale back to normal
+
+	DisableGlowMaterial();
+	DisableCustomDepth();
 }
 
 void AItem::PickupInterpHandler(float DeltaTime)
@@ -208,7 +232,7 @@ void AItem::PickupInterpHandler(float DeltaTime)
 	
 	if(Character && ItemZCurve)
 	{
-		const float ElapsedTime = GetWorldTimerManager().GetTimerElapsed(CurveTimer);
+		const float ElapsedTime = GetWorldTimerManager().GetTimerElapsed(InterpCurveTimer);
 		const float ZCurveValue = ItemZCurve -> GetFloatValue(ElapsedTime);
 
 		FVector ItemCurrentLocation = ItemInterpStartLocation;
@@ -249,7 +273,7 @@ void AItem::PickupInterpHandler(float DeltaTime)
 	}
 }
 
-bool AItem::GetPickupInterpTargetLocation(FVector &Location)
+bool AItem::GetPickupInterpTargetLocation(FVector &Location) const
 {
 	if(Character == nullptr) return false;
 
@@ -280,6 +304,81 @@ void AItem::PlayPickupSound() const
 	}
 }
 
+void AItem::EnableGlowMaterial() const
+{
+	if(GlowMaterialInstanceDynamic)
+	{
+		GlowMaterialInstanceDynamic -> SetScalarParameterValue(GlowBlendAlphaParameterName, 0.f);
+	}
+}
+
+void AItem::DisableGlowMaterial() const
+{
+	if(GlowMaterialInstanceDynamic)
+	{
+		GlowMaterialInstanceDynamic -> SetScalarParameterValue(GlowBlendAlphaParameterName, 1.f);
+	}
+}
+
+void AItem::OnConstruction(const FTransform& Transform)
+{
+	if(GlowMaterialInstance)
+	{
+		GlowMaterialInstanceDynamic = UMaterialInstanceDynamic::Create(GlowMaterialInstance, this);
+		ItemMesh -> SetMaterial(GlowMaterialIndex, GlowMaterialInstanceDynamic);
+	}
+
+	EnableGlowMaterial();
+}
+
+void AItem::StartGlowPulseTimer()
+{
+	if(ItemState == EItemState::EIS_Pickup)
+	{
+		GetWorldTimerManager().SetTimer(GlowPulseTimer, this,
+			&AItem::ResetGlowPulseTimer, GlowPulseDuration);
+	}
+}
+
+void AItem::ResetGlowPulseTimer()
+{
+	StartGlowPulseTimer();
+}
+
+void AItem::GlowPulseHandler() const
+{
+	if(ItemState == EItemState::EIS_Equipped) return;
+	
+	float ElapsedTime{};
+	FVector GlowPulseVector{};
+	
+	switch(ItemState) // Pick the proper curve to read data from
+	{
+	case EItemState::EIS_Pickup:
+		if(GlowPulseCurve)
+		{
+			ElapsedTime = GetWorldTimerManager().GetTimerElapsed(GlowPulseTimer);
+			GlowPulseVector = GlowPulseCurve -> GetVectorValue(ElapsedTime);
+		}
+	case EItemState::EIS_EquipInterp:
+		if(GlowPulseInterpCurve)
+		{
+			ElapsedTime = GetWorldTimerManager().GetTimerElapsed(InterpCurveTimer);
+			GlowPulseVector = GlowPulseInterpCurve ->GetVectorValue(ElapsedTime);
+		}
+	}
+
+	if(GlowMaterialInstanceDynamic) // Assign the values to GlowPulse material instance
+	{
+		GlowMaterialInstanceDynamic -> SetScalarParameterValue(GlowAmountParameterName,
+			GlowPulseVector.X * GlowAmount);
+		GlowMaterialInstanceDynamic -> SetScalarParameterValue(FresnelExponentParameterName,
+			GlowPulseVector.Y * FresnelExponent);
+		GlowMaterialInstanceDynamic -> SetScalarParameterValue(FresnelReflectFractionParameterName,
+			GlowPulseVector.Z * FresnelReflectFraction);
+	}
+}
+
 // Called every frame
 void AItem::Tick(float DeltaTime)
 {
@@ -287,6 +386,8 @@ void AItem::Tick(float DeltaTime)
 	
 	// Handle item pickup interpolation when (bInterping = true)
 	PickupInterpHandler(DeltaTime);
+	// Handle glow pulsation for the item
+	GlowPulseHandler();
 }
 
 void AItem::SetItemState(EItemState State)
@@ -306,5 +407,23 @@ void AItem::PlayEquipSound() const
 				UGameplayStatics::PlaySound2D(this, EquipSound);
 			}
 		}
+	}
+}
+
+void AItem::InitializeCustomDepth()
+{
+	bCustomDepthOnBeginPlay ? EnableCustomDepth() : DisableCustomDepth();
+}
+
+void AItem::EnableCustomDepth()
+{
+	ItemMesh -> SetRenderCustomDepth(true);
+}
+
+void AItem::DisableCustomDepth()
+{
+	if(!bInterping)
+	{
+		ItemMesh -> SetRenderCustomDepth(false);
 	}
 }

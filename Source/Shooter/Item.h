@@ -75,15 +75,31 @@ protected:
 	void PickupInterpHandler(float DeltaTime);
 
 	/** Get the desired location for Item pick up interpolation */
-	bool GetPickupInterpTargetLocation(FVector &Location);
+	bool GetPickupInterpTargetLocation(FVector &Location) const;
 
 	void PlayPickupSound() const;
+
+	/** Initialize outline post-processing and assign its default value */
+	virtual void InitializeCustomDepth();
+	
+	virtual void OnConstruction(const FTransform &Transform) override;
+	
+	void StartGlowPulseTimer();
+
+	void ResetGlowPulseTimer();
+
+	/** Handle item's GlowPulse */	
+	void GlowPulseHandler() const;
 	
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
 private:
+	/** Type of the Item */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "ItemProperties", meta = (AllowPrivateAccess = "true"))
+	EItemType ItemType;
+	
 	/** Skeletal mesh for the item */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Item Properties", meta = (AllowPrivateAccess = "true"))
 	USkeletalMeshComponent* ItemMesh;
@@ -137,11 +153,11 @@ private:
 	bool bInterping;
 
 	/** Timer to handle item pickup interpolation */
-	FTimerHandle CurveTimer;
+	FTimerHandle InterpCurveTimer;
 	
-	/** The point in timeline where curves stop */
+	/** The point in timeline where interp curves stop */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item Properties", meta = (AllowPrivateAccess = "true"))
-	float CurveDuration;
+	float InterpCurveDuration;
 	
 	/** Reference to AShooterCharacter to access its public functions */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Item Properties", meta = (AllowPrivateAccess = "true"))
@@ -162,17 +178,76 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Properties", meta = (AllowPrivateAccess = "true"))
 	USoundCue* EquipSound;
 
-	/** Type of the Item */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "ItemProperties", meta = (AllowPrivateAccess = "true"))
-	EItemType ItemType;
-
 	/** Index of the interp location this item is currently interping to */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ItemProperties", meta = (AllowPrivateAccess = "true"))
 	int32 InterpLocationIndex;
 
+	/** Scale of the item size while interping */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	float InterpSizeScale;
+
+	/** @param True = Outline post-processing on BeginPlay [enabled]
+	 *  @param False = Outline post-processing on BeginPlay [disabled]
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+	bool bCustomDepthOnBeginPlay;
 	
+	/** Glow material instance used for the Item */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = GlowMaterial, meta = (AllowPrivateAccess = "true"))
+	UMaterialInstance* GlowMaterialInstance;
+	
+	/** Index for the target material to be changed at runtime */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = GlowMaterial, meta = (AllowPrivateAccess = "true"))
+	int32 GlowMaterialIndex;
+
+	/** Name of the Glow blend alpha parameter */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = GlowMaterial, meta = (AllowPrivateAccess = "true"))
+	FName GlowBlendAlphaParameterName;
+
+	/** Name of the Glow amount parameter */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = GlowMaterial, meta = (AllowPrivateAccess = "true"))
+	FName GlowAmountParameterName;
+
+	/** Name of the Fresnel exponent parameter */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = GlowMaterial, meta = (AllowPrivateAccess = "true"))
+	FName FresnelExponentParameterName;
+
+	/** Name of the Fresnel reflect fraction parameter */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = GlowMaterial, meta = (AllowPrivateAccess = "true"))
+	FName FresnelReflectFractionParameterName;
+
+	/** Value of GlowAmount factor */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = GlowMaterial, meta = (AllowPrivateAccess = "true"))
+	float GlowAmount;
+
+	/** Value of FresnelExponent factor */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = GlowMaterial, meta = (AllowPrivateAccess = "true"))
+	float FresnelExponent;
+
+	/** Value of FresnelReflectFraction factor */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = GlowMaterial, meta = (AllowPrivateAccess = "true"))
+	float FresnelReflectFraction;
+	
+	/** Dynamic instance that changes at runtime */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = GlowMaterial, meta = (AllowPrivateAccess = "true"))
+	UMaterialInstanceDynamic* GlowMaterialInstanceDynamic;
+
+	/** CurveVector for glow pulse */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = GlowMaterial, meta = (AllowPrivateAccess = "true"))
+	class UCurveVector* GlowPulseCurve;
+
+	/** CurveVector for glow pulse while interping */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = GlowMaterial, meta = (AllowPrivateAccess = "true"))
+	UCurveVector* GlowPulseInterpCurve;
+
+	/** Timer to handle glow pulse effect */
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = GlowMaterial, meta = (AllowPrivateAccess = "true"))
+	FTimerHandle GlowPulseTimer;
+
+	/** The point in timeline where GlowPulseCurve stops */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = GlowMaterial, meta = (AllowPrivateAccess = "true"))
+	float GlowPulseDuration;
+
 public:	
 	FORCEINLINE UWidgetComponent* GetPickupWidget() const { return PickupWidget; }
 	FORCEINLINE UBoxComponent* GetCollisionBox() const { return CollisionBox; }
@@ -186,10 +261,20 @@ public:
 	/** Set new state for ItemState and calls UpdateItemProperties() */
 	void SetItemState(EItemState State);
 	
-	/** Play CurveTimer and call PickupInterpHandler() every frame
+	/** Play PickupCurveTimer and call PickupInterpHandler() every frame
 	 *	to handle pickup interpolation based on the curve values
 	 *	@param Char This is a pointer to the player who is picking up the item */
 	void StartPickingItem(AShooterCharacter* Char);
 
 	void PlayEquipSound() const;
+
+	void EnableGlowMaterial() const;
+	
+	void DisableGlowMaterial() const;
+	
+	/** Enable outline post-process */
+	virtual void EnableCustomDepth();
+
+	/** Disable outline post-process */
+	virtual void DisableCustomDepth();
 };
