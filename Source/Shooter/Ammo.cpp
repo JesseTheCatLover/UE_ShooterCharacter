@@ -70,6 +70,14 @@ void AAmmo::UpdateItemProperties(EItemState State)
 		AmmoMesh -> SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
 		AmmoMesh -> SetCollisionResponseToChannel(ECollisionChannel::ECC_WorldStatic, ECollisionResponse::ECR_Block);
 		break;
+
+	case EItemState::EIS_PickedUp:
+		AmmoMesh -> SetSimulatePhysics(false);
+		AmmoMesh -> SetEnableGravity(false);
+		AmmoMesh -> SetVisibility(false);
+		AmmoMesh -> SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
+		AmmoMesh -> SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		break;
 	}
 }
 

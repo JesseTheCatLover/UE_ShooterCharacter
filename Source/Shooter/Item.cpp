@@ -37,7 +37,9 @@ AItem::AItem():
 	GlowAmount(150.f),
 	FresnelExponent(3.f),
 	FresnelReflectFraction(4.f),
-	GlowPulseDuration(5.f)
+	GlowPulseDuration(5.f),
+	// Inventory
+	SlotIndex(0)
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
@@ -177,6 +179,17 @@ void AItem::UpdateItemProperties(EItemState State)
 		ItemMesh -> SetVisibility(true);
 		ItemMesh -> SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
 		ItemMesh -> SetCollisionResponseToChannel(ECollisionChannel::ECC_WorldStatic, ECollisionResponse::ECR_Block);
+		CollisionBox -> SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
+		CollisionBox -> SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		AreaSphere -> SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
+		AreaSphere -> SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		break;
+	case EItemState::EIS_PickedUp:
+		ItemMesh -> SetSimulatePhysics(false);
+		ItemMesh -> SetEnableGravity(false);
+		ItemMesh -> SetVisibility(false);
+		ItemMesh -> SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
+		ItemMesh -> SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		CollisionBox -> SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
 		CollisionBox -> SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		AreaSphere -> SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
@@ -360,12 +373,14 @@ void AItem::GlowPulseHandler() const
 			ElapsedTime = GetWorldTimerManager().GetTimerElapsed(GlowPulseTimer);
 			GlowPulseVector = GlowPulseCurve -> GetVectorValue(ElapsedTime);
 		}
+		break;
 	case EItemState::EIS_EquipInterp:
 		if(GlowPulseInterpCurve)
 		{
 			ElapsedTime = GetWorldTimerManager().GetTimerElapsed(InterpCurveTimer);
 			GlowPulseVector = GlowPulseInterpCurve ->GetVectorValue(ElapsedTime);
 		}
+		break;
 	}
 
 	if(GlowMaterialInstanceDynamic) // Assign the values to GlowPulse material instance

@@ -63,7 +63,7 @@ AShooterCharacter::AShooterCharacter():
 	// Crouching
 	bCrouching(false),
 	bCrouchToggling(false),
-	HipMovementSpeed(600.f),
+	HipMovementSpeed(500.f),
 	AimingMovementSpeed(400.f),
 	CrouchMovementSpeed(280.f),
 	HipCapsuleHalfHeight(88.f),
@@ -72,7 +72,7 @@ AShooterCharacter::AShooterCharacter():
 	CapsuleHalfHeightInterpSpeed(5.f),
 	// Jumping
 	bLandRecovering(false),
-	JumpBoostVelocity(500.f),
+	JumpBoostVelocity(270.f),
 	LandingRecoveryMovementSpeed(570.f),
 	// Pickup/Equip sound timer
 	bShouldPlayPickupSound(true),
@@ -103,7 +103,7 @@ AShooterCharacter::AShooterCharacter():
 	// Configure character movement
 	GetCharacterMovement() -> bOrientRotationToMovement = false; // Character moves at the direction of input...
 	GetCharacterMovement() -> RotationRate = FRotator(0.f, 540.f, 0.f); //... at this rate
-	GetCharacterMovement() -> GravityScale = 1.4f;
+	GetCharacterMovement() -> GravityScale = 1.5f;
 	GetCharacterMovement() -> JumpZVelocity = 650.f;
 	GetCharacterMovement() -> AirControl = 0.1f;
 
@@ -139,7 +139,8 @@ void AShooterCharacter::BeginPlay()
 		CameraCurrentFOV = CameraDefaultFOV;
 	}
 	// Spawn the default Weapon and equip it
-	EquipWeapon(SpawnDefaultWeapon());
+	AddToInventory(SpawnDefaultWeapon());
+	EquipWeapon(Cast<AWeapon>(Inventory[0]));
 	// Initialize AmmoMap with starting values
 	InitializeAmmoMap();
 	// Initialize InterpLocations for item picking interping
@@ -319,10 +320,12 @@ void AShooterCharacter::AimingButtonReleased()
 
 void AShooterCharacter::SelectButtonPressed()
 {
+	if(CombatState != ECombatState::ECS_Unoccupied) return;
+	
 	if(PickupTraceHitItem)
 	{
 		PickupTraceHitItem -> StartPickingItem(this);
-
+		
 		PickupTraceHitItem = nullptr;
 		PreviousPickupTraceHitItem = nullptr;
 	}
@@ -335,7 +338,7 @@ void AShooterCharacter::SelectButtonReleased()
 
 void AShooterCharacter::DropButtonPressed()
 {
-	DropWeapon();
+
 }
 
 void AShooterCharacter::DropButtonReleased()
@@ -403,7 +406,7 @@ void AShooterCharacter::CalculateCrosshairSpread(float DeltaTime)
 		CrosshairAimingFactor = FMath::FInterpTo(CrosshairAimingFactor, 0.f, DeltaTime, 30.f);
 	}
 
-	// Calculate crosshair shoot factor
+	// Calculate crosshair shooting factor
 	if(bFiringBullet)
 	{
 		CrosshairShootingFactor = FMath::FInterpTo(CrosshairShootingFactor, 0.3f, DeltaTime, 60.f);
@@ -465,6 +468,10 @@ void AShooterCharacter::PickupTrace()
 		if(ItemTraceResult.bBlockingHit)
 		{
 			PickupTraceHitItem = Cast<AItem>(ItemTraceResult.GetActor());
+			if(PickupTraceHitItem && PickupTraceHitItem -> GetItemState() == EItemState::EIS_EquipInterp)
+			{
+				PickupTraceHitItem = nullptr;
+			}
 			if(PickupTraceHitItem && PickupTraceHitItem -> GetPickupWidget())
 			{
 				// Show Item pickup widget 
@@ -504,15 +511,25 @@ AWeapon* AShooterCharacter::SpawnDefaultWeapon() const
 	return nullptr;
 }
 
-void AShooterCharacter::EquipWeapon(AWeapon* WeaponToEquip)
+void AShooterCharacter::EquipWeapon(AWeapon* WeaponToEquip,  bool bSwapping)
 {
 	if(WeaponToEquip)
 	{
 		const USkeletalMeshSocket* HandSocket = GetMesh() -> GetSocketByName(FName("righthand_socket"));
-		
 		if(HandSocket)
 		{
 			HandSocket -> AttachActor(WeaponToEquip, GetMesh());
+		}
+		if(EquippedWeapon == nullptr) // Broadcasting Inventory selection index
+		{
+			// -1 == Spawned default weapon. no need to reverse any icon animation.
+			EquipItemDelegate.Broadcast(-1, WeaponToEquip -> GetSlotIndex());
+		}
+		else // if we are swapping, we don't need to reverse the animation.
+		{
+			// Reverse the previously equipped item anim icon, and forward play the newly equipped item anim icon
+			EquipItemDelegate.Broadcast(EquippedWeapon -> GetSlotIndex(),
+				WeaponToEquip -> GetSlotIndex());
 		}
 		EquippedWeapon = WeaponToEquip;
 		EquippedWeapon -> SetItemState(EItemState::EIS_Equipped);
@@ -528,14 +545,50 @@ void AShooterCharacter::DropWeapon()
 		
 		EquippedWeapon -> SetItemState(EItemState::EIS_Falling);
 		EquippedWeapon -> ThrowWeapon();
-		EquippedWeapon = nullptr;
 	}
 }
 
 void AShooterCharacter::SwapWeapon(AWeapon* WeaponToSwap)
 {
+	if(EquippedWeapon == nullptr || WeaponToSwap == nullptr) return;
+	
+	ReplaceInInventory(WeaponToSwap, EquippedWeapon -> GetSlotIndex());
 	DropWeapon();
-	EquipWeapon(WeaponToSwap);
+	EquipWeapon(WeaponToSwap, true);
+}
+
+void AShooterCharacter::AddToInventory(AWeapon* Weapon)
+{
+	Inventory.Add(Weapon); // Add it at the end of the inventory list
+	Weapon -> SetSlotIndex(Inventory.Find(Weapon)); // Indicate and save index location for the Weapon class
+}
+
+void AShooterCharacter::ReplaceInInventory(AWeapon* Weapon, int32 Index)
+{
+	if(Inventory.IsValidIndex(Index)) // If the index we are replacing exists in the inventory
+	{
+		Inventory[Index] = Weapon; // Replace it at a specific index in the inventory list
+		Weapon -> SetSlotIndex(Index); // Update the index
+	}
+}
+
+void AShooterCharacter::ExchangeInventoryItems(int32 CurrentItemIndex, int32 NewItemIndex)
+{
+	const bool bCanExchangeItems = (CurrentItemIndex != NewItemIndex) && (Inventory.IsValidIndex(NewItemIndex))
+	&& (CombatState == ECombatState::ECS_Unoccupied);
+
+	if(bCanExchangeItems)
+	{
+		EquippedWeapon -> SetItemState(EItemState::EIS_PickedUp);
+		EquipWeapon(Cast<AWeapon>(Inventory[NewItemIndex]));
+
+		UAnimInstance* AnimInstance = GetMesh() -> GetAnimInstance();
+		if(AnimInstance && HipEquipMontage)
+		{
+			AnimInstance -> Montage_Play(HipEquipMontage);
+			AnimInstance -> Montage_JumpToSection("Equipping");
+		}
+	}
 }
 
 void AShooterCharacter::InitializeAmmoMap()
@@ -560,8 +613,7 @@ void AShooterCharacter::PlayFireSound() const
 
 void AShooterCharacter::SendBullet() const
 {
-	const USkeletalMeshSocket* BarrelSocket = EquippedWeapon -> GetItemMesh() -> GetSocketByName("BarrelSocket");
-	if(BarrelSocket)
+	if(const USkeletalMeshSocket* BarrelSocket = EquippedWeapon -> GetItemMesh() -> GetSocketByName("BarrelSocket"))
 	{
 		const FTransform SocketTransform = BarrelSocket -> GetSocketTransform(EquippedWeapon -> GetItemMesh());
 		if(MuzzleFlash)
@@ -727,7 +779,7 @@ void AShooterCharacter::HandleHalfHeightInterp(float DeltaTime) const
 
 void AShooterCharacter::Jump()
 {
-	if(!bCrouching && !bLandRecovering)
+	if(!bCrouching && !bLandRecovering && GetCurrentSpeed() > 0)
 	{
 		GetCharacterMovement() -> MaxWalkSpeed = HipMovementSpeed + JumpBoostVelocity;
 		ACharacter::Jump();
@@ -799,6 +851,42 @@ void AShooterCharacter::ResetEquipSoundTimer()
 	bShouldPlayEquipSound = true;
 }
 
+void AShooterCharacter::EquipDefaultWeapon()
+{
+	if(EquippedWeapon -> GetSlotIndex() == 0) return;
+	ExchangeInventoryItems(EquippedWeapon -> GetSlotIndex(), 0);
+}
+
+void AShooterCharacter::EquipWeaponOne()
+{
+	if(EquippedWeapon -> GetSlotIndex() == 1) return;
+	ExchangeInventoryItems(EquippedWeapon -> GetSlotIndex(), 1);
+}
+
+void AShooterCharacter::EquipWeaponTwo()
+{
+	if(EquippedWeapon -> GetSlotIndex() == 2) return;
+	ExchangeInventoryItems(EquippedWeapon -> GetSlotIndex(), 2);
+}
+
+void AShooterCharacter::EquipWeaponThree()
+{
+	if(EquippedWeapon -> GetSlotIndex() == 3) return;
+	ExchangeInventoryItems(EquippedWeapon -> GetSlotIndex(), 3);
+}
+
+void AShooterCharacter::EquipWeaponFour()
+{
+	if(EquippedWeapon -> GetSlotIndex() == 4) return;
+	ExchangeInventoryItems(EquippedWeapon -> GetSlotIndex(), 4);
+}
+
+void AShooterCharacter::EquipWeaponFive()
+{
+	if(EquippedWeapon -> GetSlotIndex() == 5) return;
+	ExchangeInventoryItems(EquippedWeapon -> GetSlotIndex(), 5);
+}
+
 // Called every frame
 void AShooterCharacter::Tick(float DeltaTime)
 {
@@ -843,6 +931,12 @@ void AShooterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 	PlayerInputComponent->BindAction("Drop", IE_Released, this, &AShooterCharacter::DropButtonReleased);
 	PlayerInputComponent->BindAction("Reload", IE_Pressed, this, &AShooterCharacter::ReloadButtonPressed);
 	PlayerInputComponent->BindAction("Crouch", IE_Pressed, this, &AShooterCharacter::CrouchingButtonPressed);
+	PlayerInputComponent->BindAction("EquipDefaultWeapon", IE_Pressed, this, &AShooterCharacter::EquipDefaultWeapon);
+	PlayerInputComponent->BindAction("EquipWeaponOne", IE_Pressed, this, &AShooterCharacter::EquipWeaponOne);
+	PlayerInputComponent->BindAction("EquipWeaponTwo", IE_Pressed, this, &AShooterCharacter::EquipWeaponTwo);
+	PlayerInputComponent->BindAction("EquipWeaponThree", IE_Pressed, this, &AShooterCharacter::EquipWeaponThree);
+	PlayerInputComponent->BindAction("EquipWeaponFour", IE_Pressed, this, &AShooterCharacter::EquipWeaponFour);
+	PlayerInputComponent->BindAction("EquipWeaponFive", IE_Pressed, this, &AShooterCharacter::EquipWeaponFive);
 }
 
 float AShooterCharacter::GetCrosshairSpreadMultiplier() const
@@ -904,7 +998,14 @@ void AShooterCharacter::PickupItem(AItem* Item)
 	auto Weapon = Cast<AWeapon>(Item);
 	if(Weapon)
 	{
-		SwapWeapon(Weapon);
+		if(Inventory.Num() < INVENTORY_CAPACITY)
+		{
+			AddToInventory(Weapon);
+		}
+		else // Inventory is full. swapping it with the current equipped weapon.
+		{
+			SwapWeapon(Weapon);	
+		}
 		return;
 	}
 

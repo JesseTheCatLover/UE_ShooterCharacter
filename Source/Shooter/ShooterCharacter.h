@@ -13,6 +13,7 @@ enum class ECombatState : uint8
 	ECS_Unoccupied UMETA(DisplayName = "Unoccupied"),
 	ECS_FireRateTimerInProgress UMETA(DisplayName = "FireRateTimerInProgress"),
 	ECS_Reloading UMETA(DisplayName = "Reloading"),
+	ECS_Equipping UMETA(DisplayName = "Equipping"),
 
 	ECS_Max UMETA(DisplayName = "DefaultMax")
 };
@@ -30,6 +31,8 @@ struct FInterpLocation
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	int32 ItemCount;
 };
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FEquipItemDelegate, int32, CurrentSlotIndex, int32, NewSlotIndex);
 
 UCLASS()
 class SHOOTER_API AShooterCharacter : public ACharacter
@@ -127,7 +130,7 @@ protected:
 	class AWeapon* SpawnDefaultWeapon() const;
 
 	/** Attach Weapon to HandSocket and apply appropriate properties */
-	void EquipWeapon(AWeapon* WeaponToEquip);
+	void EquipWeapon(AWeapon* WeaponToEquip,  bool bSwapping = false);
 
 	/** Detach Weapon from HandSocket and drop it */
 	void DropWeapon();
@@ -200,6 +203,21 @@ protected:
 	/** Create FInterpLocation structs for each location, and add them to the array */
 	void InitializeInterpLocations();
 
+	/** Handle adding items to the inventory by filling order */
+	void AddToInventory(AWeapon* Weapon);
+	
+	/** Handle replacing items in the inventory for a specific index */
+	void ReplaceInInventory(AWeapon* Weapon, int32 Index);
+	
+	void ExchangeInventoryItems(int32 CurrentItemIndex, int32 NewItemIndex);
+	
+	void EquipDefaultWeapon();
+	void EquipWeaponOne();
+	void EquipWeaponTwo();
+	void EquipWeaponThree();
+	void EquipWeaponFour();
+	void EquipWeaponFive();
+	
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
@@ -275,6 +293,10 @@ private:
 	/** Montage for firing weapon */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Combat , meta = (AllowPrivateAccess = "true"))
 	UAnimMontage* HipFireMontage;
+
+	/** Montage for equipping weapon */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Combat , meta = (AllowPrivateAccess = "true"))
+	UAnimMontage* HipEquipMontage;
 
 	/** Particles spawned upon bullet impact */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Combat , meta = (AllowPrivateAccess = "true"))
@@ -483,6 +505,16 @@ private:
 	/** Amount of time between each equip sound */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Items, meta = (AllowPrivateAccess = "true"))
 	float EquipSoundTimerDuration;
+
+	/** An array of AItems for our Inventory */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Inventory, meta = (AllowPrivateAccess = "true"))
+	TArray<AItem*> Inventory;
+
+	const int32 INVENTORY_CAPACITY{ 6 };
+
+	/* Delegate for sending slot information to Inventory bar when equipping */
+	UPROPERTY(BlueprintAssignable, Category = Delegates, meta = (AllowPrivateAccess = "true"))
+	FEquipItemDelegate EquipItemDelegate;
 	
 public:
 	/** Returns CameraBoom subObject */
