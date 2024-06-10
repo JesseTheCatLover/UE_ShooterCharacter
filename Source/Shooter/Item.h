@@ -77,7 +77,7 @@ protected:
 	/** Get the desired location for Item pick up interpolation */
 	bool GetPickupInterpTargetLocation(FVector &Location) const;
 
-	void PlayPickupSound() const;
+	void PlayPickupSound(bool bForcePlay = false) const;
 
 	/** Initialize outline post-processing and assign its default value */
 	virtual void InitializeCustomDepth();
@@ -264,6 +264,10 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Inventory, meta = (AllowPrivateAccess = "true"))
 	int32 SlotIndex;
 
+	/** True when Character's inventory is full */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Inventory, meta = (AllowPrivateAccess = "true"))
+	bool bCharacterInventoryFull;
+
 public:	
 	FORCEINLINE UWidgetComponent* GetPickupWidget() const { return PickupWidget; }
 	FORCEINLINE UBoxComponent* GetCollisionBox() const { return CollisionBox; }
@@ -275,6 +279,8 @@ public:
 	FORCEINLINE USoundCue* GetEquipSound() const { return EquipSound; }
 	FORCEINLINE int32 GetSlotIndex() const { return SlotIndex; }
 	FORCEINLINE void SetSlotIndex(int32 Index) { SlotIndex = Index; }
+	FORCEINLINE void SetCharacter(AShooterCharacter* Char) { Character = Char; }
+	FORCEINLINE void SetCharacterInventoryFull(bool bFull) { bCharacterInventoryFull = bFull; }
 	
 	/** Set new state for ItemState and calls UpdateItemProperties() */
 	void SetItemState(EItemState State);
@@ -282,9 +288,9 @@ public:
 	/** Play PickupCurveTimer and call PickupInterpHandler() every frame
 	 *	to handle pickup interpolation based on the curve values
 	 *	@param Char This is a pointer to the player who is picking up the item */
-	void StartPickingItem(AShooterCharacter* Char);
+	void StartPickingItem(AShooterCharacter* Char, bool bForcePlay = false);
 
-	void PlayEquipSound() const;
+	void PlayEquipSound(bool bForcePlay = false) const;
 
 	void EnableGlowMaterial() const;
 	

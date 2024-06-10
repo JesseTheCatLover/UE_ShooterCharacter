@@ -25,6 +25,7 @@ UShooterAnimInstance::UShooterAnimInstance():
 	CharacterRotationPreviousFrame(FRotator(0.f)),
 	CharacterYawDelta(0.f),
 	bCrouching(false),
+	bEquipping(false),
 	bIsIdle(true),
 	bCanIdle(true),
 	IdleCoolDown(7.f),
@@ -65,6 +66,7 @@ void UShooterAnimInstance::UpdateAnimationProperties()
 	bFiring = ShooterCharacter -> GetFireButtonPressed();
 	bCrouching = ShooterCharacter -> GetCrouching();
 	bReloading = ShooterCharacter -> GetCombatState() == ECombatState::ECS_Reloading;
+	bEquipping = ShooterCharacter -> GetCombatState() == ECombatState::ECS_Equipping;
 	bIsInAir = ShooterCharacter -> GetCharacterMovement() -> IsFalling();
 	
 	// Is the character accelerating?
@@ -94,6 +96,7 @@ void UShooterAnimInstance::UpdateIsIdle()
 	else if(bAiming) bIsIdle = false;
 	else if(bFiring) bIsIdle = false;
 	else if(bReloading) bIsIdle = false;
+	else if(bEquipping) bIsIdle = false;
 	else if(bTurning) bIsIdle = false;
 	else if(bCrouching) bIsIdle = false;
 	else bIsIdle = true;
@@ -104,18 +107,18 @@ void UShooterAnimInstance::UpdateRecoilWeight()
 	if(bTurning)
 	{
 		// No recoil while turning
-		RecoilWeight = bReloading ? 1.f : 0.f;
+		RecoilWeight = bReloading || bEquipping ? 1.f : 0.f;
 	}
 	else // not turning
 		{
 		if(bCrouching)
 		{
 			// Lower recoil while crouching
-			RecoilWeight = bReloading ? 1.f : 0.1f;
+			RecoilWeight = bReloading || bEquipping ? 1.f : 0.1f;
 		}
 		else // Standing
 			{
-			RecoilWeight = bAiming || bReloading ? 1.f : 0.5f;
+			RecoilWeight = bAiming || bReloading || bEquipping ? 1.f : 0.5f;
 			}
 		}
 }

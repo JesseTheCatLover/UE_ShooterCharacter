@@ -33,6 +33,7 @@ struct FInterpLocation
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FEquipItemDelegate, int32, CurrentSlotIndex, int32, NewSlotIndex);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FHighlightIconDelegate, int32, SlotIndex, bool, bStartAnimation);
 
 UCLASS()
 class SHOOTER_API AShooterCharacter : public ACharacter
@@ -167,6 +168,9 @@ protected:
 	UFUNCTION(BlueprintCallable)
 	void FinishReloading();
 
+	UFUNCTION(BlueprintCallable)
+	void FinishEquipping();
+
 	/** Return true if the character is carrying the type of ammo matching to EquippedWeapon's */
 	bool CarryingAmmo();
 	
@@ -217,6 +221,12 @@ protected:
 	void EquipWeaponThree();
 	void EquipWeaponFour();
 	void EquipWeaponFive();
+
+	void EquipNextWeapon();
+	void EquipPreviousWeapon();
+
+	/** Return the first empty slot in our inventory list */
+	int32 GetEmptyInventorySlotIndex();
 	
 public:	
 	// Called every frame
@@ -463,6 +473,10 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
 	float JumpBoostVelocity;
 
+	/** The minimum speed required for being able to jump */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
+	float MinimumSpeedNeededForJumping;
+
 	/** Amount of speed for the character while recovering from landing (cm/s) */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
 	float LandingRecoveryMovementSpeed;
@@ -515,6 +529,14 @@ private:
 	/* Delegate for sending slot information to Inventory bar when equipping */
 	UPROPERTY(BlueprintAssignable, Category = Delegates, meta = (AllowPrivateAccess = "true"))
 	FEquipItemDelegate EquipItemDelegate;
+
+	/** Delegate for highlighting the selected slot in the Inventory */
+	UPROPERTY(VisibleAnywhere, BlueprintAssignable, Category = Inventory , meta = (AllowPrivateAccess = "true"))
+	FHighlightIconDelegate HighlightIconDelegate;
+
+	/** Slot index of the highlighted slot */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Inventory, meta = (AllowPrivateAccess = "true"))
+	int32 HighlightedSlotIndex;
 	
 public:
 	/** Returns CameraBoom subObject */
@@ -561,4 +583,7 @@ public:
 
 	void StartPickupSoundTimer();
 	void StartEquipSoundTimer();
+
+	void HighlightInventorySlot();
+	void UnHighlightInventorySlot();
 };

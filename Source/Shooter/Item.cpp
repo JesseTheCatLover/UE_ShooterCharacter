@@ -39,7 +39,8 @@ AItem::AItem():
 	FresnelReflectFraction(4.f),
 	GlowPulseDuration(5.f),
 	// Inventory
-	SlotIndex(0)
+	SlotIndex(0),
+	bCharacterInventoryFull(false)
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
@@ -108,6 +109,7 @@ void AItem::OnSphereEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor*
 		if(ShooterCharacter)
 		{
 			ShooterCharacter -> IncrementOverlappedItemCount(-1);
+			ShooterCharacter -> UnHighlightInventorySlot();
 		}
 	}
 }
@@ -198,7 +200,7 @@ void AItem::UpdateItemProperties(EItemState State)
 	}
 }
 
-void AItem::StartPickingItem(AShooterCharacter* Char)
+void AItem::StartPickingItem(AShooterCharacter* Char, bool bForcePlay)
 {
 	Character = Char; // Store a handle to the Character that picked the item
 
@@ -206,7 +208,7 @@ void AItem::StartPickingItem(AShooterCharacter* Char)
 	// Add 1 to the ItemCount for this interpolation struct 
 	Character -> IncrementInterpLocItemCount(InterpLocationIndex, 1);
 	
-	PlayPickupSound();
+	PlayPickupSound(bForcePlay); // TODO: Check to see if this should be force played...
 	
 	ItemInterpStartLocation = GetActorLocation();
 	bInterping = true;
@@ -232,6 +234,7 @@ void AItem::FinishInterping()
 		Character -> PickupItem(this);
 		// Subtract 1 from the ItemCount of this InterpLocation struct
 		Character -> IncrementInterpLocItemCount(InterpLocationIndex, -1);
+		Character -> UnHighlightInventorySlot();
 	}
 	if(ItemScaleCurve) SetActorScale3D(FVector(1.f)); // Set scale back to normal
 
@@ -303,17 +306,24 @@ bool AItem::GetPickupInterpTargetLocation(FVector &Location) const
 	return false;
 }
 
-void AItem::PlayPickupSound() const
+void AItem::PlayPickupSound(bool bForceplay) const
 {
 	if(Character)
 	{
-		if(Character -> GetShouldPickupSound())
-		{
-			if(PickupSound)
-			{
-				UGameplayStatics::PlaySound2D(this, PickupSound);
-			}
-		}
+		if(bForceplay)
+       	{
+       		if(PickupSound)
+      		{
+       			UGameplayStatics::PlaySound2D(this, PickupSound);
+       		}
+   		}
+       	else if(Character -> GetShouldPickupSound())
+        {
+        	if(PickupSound)
+        	{
+        		UGameplayStatics::PlaySound2D(this, PickupSound);
+        	}
+       	}
 	}
 }
 
@@ -411,11 +421,18 @@ void AItem::SetItemState(EItemState State)
 	UpdateItemProperties(State);
 }
 
-void AItem::PlayEquipSound() const
+void AItem::PlayEquipSound(bool bForcePlay) const
 {
 	if(Character)
 	{
-		if(Character -> GetShouldEquipSound())
+		if(bForcePlay)
+		{
+			if(EquipSound)
+			{
+				UGameplayStatics::PlaySound2D(this, EquipSound);
+			}
+		}
+		else if(Character -> GetShouldEquipSound())
 		{
 			if(EquipSound)
 			{
