@@ -208,7 +208,7 @@ void AItem::StartPickingItem(AShooterCharacter* Char, bool bForcePlay)
 	// Add 1 to the ItemCount for this interpolation struct 
 	Character -> IncrementInterpLocItemCount(InterpLocationIndex, 1);
 	
-	PlayPickupSound(bForcePlay); // TODO: Check to see if this should be force played...
+	PlayPickupSound(true);
 	
 	ItemInterpStartLocation = GetActorLocation();
 	bInterping = true;
@@ -345,13 +345,16 @@ void AItem::DisableGlowMaterial() const
 
 void AItem::OnConstruction(const FTransform& Transform)
 {
+	// Load the data in the ItemRarityDataTable
+	LoadRarityData();
+
 	if(GlowMaterialInstance)
 	{
 		GlowMaterialInstanceDynamic = UMaterialInstanceDynamic::Create(GlowMaterialInstance, this);
+		GlowMaterialInstanceDynamic -> SetVectorParameterValue(TEXT("FresnelColor"), GlowColor);
 		ItemMesh -> SetMaterial(GlowMaterialIndex, GlowMaterialInstanceDynamic);
+		EnableGlowMaterial();
 	}
-
-	EnableGlowMaterial();
 }
 
 void AItem::StartGlowPulseTimer()
@@ -401,6 +404,40 @@ void AItem::GlowPulseHandler() const
 			GlowPulseVector.Y * FresnelExponent);
 		GlowMaterialInstanceDynamic -> SetScalarParameterValue(FresnelReflectFractionParameterName,
 			GlowPulseVector.Z * FresnelReflectFraction);
+	}
+}
+
+void AItem::LoadRarityData()
+{
+	if(!ItemRarityDataTable) return;
+	
+	FItemRarityTable* RarityRow = nullptr;
+	switch(ItemRarity)
+	{
+	case EItemRarity::EIR_Damaged:
+		RarityRow = ItemRarityDataTable -> FindRow<FItemRarityTable>(FName("Damaged"), TEXT(""));
+		break;
+	case EItemRarity::EIR_Common:
+		RarityRow = ItemRarityDataTable -> FindRow<FItemRarityTable>(FName("Common"), TEXT(""));
+		break;
+	case EItemRarity::EIR_Uncommon:
+		RarityRow = ItemRarityDataTable -> FindRow<FItemRarityTable>(FName("Uncommon"), TEXT(""));
+		break;
+	case EItemRarity::EIR_Rare:
+		RarityRow = ItemRarityDataTable -> FindRow<FItemRarityTable>(FName("Rare"), TEXT(""));
+		break;
+	case EItemRarity::EIR_Legendary:
+		RarityRow = ItemRarityDataTable -> FindRow<FItemRarityTable>(FName("Legendary"), TEXT(""));
+		break;
+	}
+	if(RarityRow)
+	{
+		GlowColor = RarityRow -> GlowColor;
+		WidgetColorLight = RarityRow -> WidgetColorLight;
+		WidgetColorDark = RarityRow -> WidgetColorDark;
+		NumberOfStars = RarityRow -> NumberOfStars;
+		IconBackgroundRarity = RarityRow -> IconBackgroundRarity;
+		if(GetItemMesh()) GetItemMesh() -> SetCustomDepthStencilValue(RarityRow -> CustomDepthStencil);
 	}
 }
 

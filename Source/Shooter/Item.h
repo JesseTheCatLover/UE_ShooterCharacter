@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Engine/DataTable.h"
 #include "Item.generated.h"
 
 UENUM(BlueprintType)
@@ -37,6 +38,30 @@ enum class EItemType : uint8
 	EIT_Ammo UMETA(DisplayName = "Ammo"),
 
 	EIT_Max UMETA(DisplayName" DefaultMax")
+};
+
+USTRUCT(BlueprintType)
+struct FItemRarityTable : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FLinearColor GlowColor;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FLinearColor WidgetColorLight;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FLinearColor WidgetColorDark;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 NumberOfStars;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UTexture2D* IconBackgroundRarity;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 CustomDepthStencil;
 };
 
 UCLASS()
@@ -90,6 +115,9 @@ protected:
 
 	/** Handle item's GlowPulse */	
 	void GlowPulseHandler() const;
+
+	/** Load and populate Rarity variables from the ItemRarityDataTable class provided */
+	void LoadRarityData();
 	
 public:	
 	// Called every frame
@@ -125,7 +153,7 @@ private:
 	int32 ItemCount;
 
 	/** Item rarity - determines number of stars in Pickup widget */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item Properties", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Rarity, meta = (AllowPrivateAccess = "true"))
 	EItemRarity ItemRarity;
 
 	/** Shown stars in Pickup widget */
@@ -252,10 +280,6 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Inventory, meta = (AllowPrivateAccess = "true"))
 	UTexture2D* ItemIcon;
 	
-	/** Rarity background for this item in the inventory */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Inventory, meta = (AllowPrivateAccess = "true"))
-	UTexture2D* RarityIconBackground;
-	
 	/** AmmoType icon for this item in the inventory */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Inventory, meta = (AllowPrivateAccess = "true"))
 	UTexture2D* AmmoTypeIcon;
@@ -267,6 +291,26 @@ private:
 	/** True when Character's inventory is full */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Inventory, meta = (AllowPrivateAccess = "true"))
 	bool bCharacterInventoryFull;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Rarity, meta = (AllowPrivateAccess = "true"))
+	FLinearColor GlowColor;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Rarity, meta = (AllowPrivateAccess = "true"))
+	FLinearColor WidgetColorLight;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Rarity, meta = (AllowPrivateAccess = "true"))
+	FLinearColor WidgetColorDark;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Rarity, meta = (AllowPrivateAccess = "true"))
+	int32 NumberOfStars;
+	
+	/** Rarity background for this item in the inventory */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Rarity, meta = (AllowPrivateAccess = "true"))
+	UTexture2D* IconBackgroundRarity;
+
+	/** DataTable for Item Rarity */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = DataTable, meta = (AllowPrivateAccess = "true"))
+	class UDataTable* ItemRarityDataTable;
 
 public:	
 	FORCEINLINE UWidgetComponent* GetPickupWidget() const { return PickupWidget; }
@@ -287,7 +331,9 @@ public:
 	
 	/** Play PickupCurveTimer and call PickupInterpHandler() every frame
 	 *	to handle pickup interpolation based on the curve values
-	 *	@param Char This is a pointer to the player who is picking up the item */
+	 *	@param Char This is a pointer to the player who is picking up the item
+	 *	@param bForcePlay If true: pickup sound will be force played
+	 */
 	void StartPickingItem(AShooterCharacter* Char, bool bForcePlay = false);
 
 	void PlayEquipSound(bool bForcePlay = false) const;
