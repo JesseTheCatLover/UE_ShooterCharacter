@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Animation/AnimInstance.h"
+#include "WeaponType.h"
 #include "ShooterAnimInstance.generated.h"
 
 UENUM(BlueprintType)
@@ -145,4 +146,12 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"),
 		meta = (ClampMin = "13.0", ClampMax = "25.0", UIMin = "13.0", UIMax = "25.0"))
 	float JogTurningInterpSpeed;
+
+	/** Weapon type for the currently equipped weapon */
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = Combat, meta = (AllowPrivateAccess = "true"))
+	EWeaponType EquippedWeaponType;
+
+	/** True when not reloading or equipping */
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = Combat, meta = (AllowPrivateAccess = "true"))
+	bool bShouldUseFABRIK;
 };

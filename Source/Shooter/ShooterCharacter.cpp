@@ -1,4 +1,4 @@
-// Copyright 2023 JesseTheCatLover. All Rights Reserved.
+// Copyright 2024 JesseTheCatLover. All Rights Reserved.
 
 #include "ShooterCharacter.h"
 
@@ -50,7 +50,6 @@ AShooterCharacter::AShooterCharacter():
 	bFireButtonPressed(false),
 	bShouldFire(true),
 	bFiringBullet(false),
-    AutomaticFireRate(0.1f),
 	CrosshairShootingDuration(0.05f),
 	// Item trace variables
 	bShouldTraceForItems(false),
@@ -229,6 +228,11 @@ void AShooterCharacter::FireWeapon()
 		
 		// Start FireRateTimer to kill off weapon, in order to simulate its fire rate
 		StartFireRateTimer();
+
+		if(EquippedWeapon -> GetWeaponType() == EWeaponType::EWT_Pistol)
+		{
+			EquippedWeapon -> StartSlideTimer();
+		}
 	}
 }
 
@@ -308,18 +312,23 @@ void AShooterCharacter::FireButtonReleased()
 void AShooterCharacter::AimingButtonPressed()
 {
 	bAimingButtonPressed = true;
-	if(EquippedWeapon && CombatState != ECombatState::ECS_Reloading) // We can only aim when holding a Weapon
+	if(EquippedWeapon && CombatState != ECombatState::ECS_Reloading
+		&& CombatState != ECombatState::ECS_Equipping) // We can only aim when holding a Weapon
 	{
-		bAiming = true;
-		if(!bCrouching) GetCharacterMovement() -> MaxWalkSpeed = AimingMovementSpeed;
+		Aim();
 	}
 }
 
 void AShooterCharacter::AimingButtonReleased()
 {
 	bAimingButtonPressed = false;
-	bAiming = false;
-	if(!bCrouching) GetCharacterMovement() -> MaxWalkSpeed = HipMovementSpeed;
+	StopAiming();
+}
+
+void AShooterCharacter::Aim()
+{
+	bAiming = true;
+	if(!bCrouching) GetCharacterMovement() -> MaxWalkSpeed = AimingMovementSpeed;
 }
 
 void AShooterCharacter::SelectButtonPressed()
@@ -333,6 +342,12 @@ void AShooterCharacter::SelectButtonPressed()
 		PickupTraceHitItem = nullptr;
 		PreviousPickupTraceHitItem = nullptr;
 	}
+}
+
+void AShooterCharacter::StopAiming()
+{
+	bAiming = false;
+	if(!bCrouching) GetCharacterMovement() -> MaxWalkSpeed = HipMovementSpeed;
 }
 
 void AShooterCharacter::SelectButtonReleased()
@@ -441,17 +456,20 @@ void AShooterCharacter::FinishCrosshairBulletFire()
 
 void AShooterCharacter::StartFireRateTimer()
 {
+	if(EquippedWeapon == nullptr) return;
 	CombatState = ECombatState::ECS_FireRateTimerInProgress;
-	GetWorldTimerManager().SetTimer(AutomaticFireRateTimer, this, &AShooterCharacter::FireRateTimerReset, AutomaticFireRate);
+	GetWorldTimerManager().SetTimer(AutomaticFireRateTimer, this, &AShooterCharacter::FireRateTimerReset,
+		EquippedWeapon -> GetAutoFireRate());
 }
 
 void AShooterCharacter::FireRateTimerReset()
 {
+	if(EquippedWeapon == nullptr) return;
 	CombatState = ECombatState::ECS_Unoccupied;
 
 	if(WeaponHasAmmo())
 	{
-		if(bFireButtonPressed)
+		if(bFireButtonPressed && EquippedWeapon -> GetAutomatic())
 		{
 			FireWeapon();
 		}
@@ -510,7 +528,7 @@ void AShooterCharacter::PickupTrace()
 			}
 
 			// If linetrace hit an item last frame
-			if(PreviousPickupTraceHitItem)
+			if(PreviousPickupTraceHitItem && PreviousPickupTraceHitItem -> GetPickupWidget())
 			{
 				if(PickupTraceHitItem != PreviousPickupTraceHitItem) // If linetrace hit a new item this frame
 				{
@@ -609,6 +627,10 @@ void AShooterCharacter::ExchangeInventoryItems(int32 CurrentItemIndex, int32 New
 
 	if(bCanExchangeItems)
 	{
+		if(bAiming)
+		{
+			StopAiming();
+		}
 		EquippedWeapon -> SetItemState(EItemState::EIS_PickedUp);
 		EquipWeapon(Cast<AWeapon>(Inventory[NewItemIndex]));
 
@@ -636,20 +658,22 @@ bool AShooterCharacter::WeaponHasAmmo() const
 
 void AShooterCharacter::PlayFireSound() const
 {
-	if(FireSound)
+	if(EquippedWeapon == nullptr) return;
+	if(EquippedWeapon -> GetFireSound())
 	{
-		UGameplayStatics::PlaySound2D(this, FireSound);
+		UGameplayStatics::PlaySound2D(this, EquippedWeapon -> GetFireSound());
 	}
 }
 
 void AShooterCharacter::SendBullet() const
 {
+	if(EquippedWeapon == nullptr) return;
 	if(const USkeletalMeshSocket* BarrelSocket = EquippedWeapon -> GetItemMesh() -> GetSocketByName("BarrelSocket"))
 	{
 		const FTransform SocketTransform = BarrelSocket -> GetSocketTransform(EquippedWeapon -> GetItemMesh());
-		if(MuzzleFlash)
+		if(EquippedWeapon -> GetMuzzleFlash())
 		{
-			UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), MuzzleFlash, SocketTransform);
+			UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), EquippedWeapon -> GetMuzzleFlash(), SocketTransform);
 		}
 
 		FVector BeamEndLocation;
@@ -696,6 +720,10 @@ void AShooterCharacter::ReloadWeapon()
 	
 	if(CarryingAmmo() && !EquippedWeapon -> ClipIsFull()) // are we carrying the correct type of ammo?
 	{
+		if(bAiming)
+		{
+			StopAiming();
+		}
 		CombatState = ECombatState::ECS_Reloading;
 		bAiming = false;
 		if(!bCrouching) GetCharacterMovement() -> MaxWalkSpeed = HipMovementSpeed;
@@ -711,6 +739,11 @@ void AShooterCharacter::ReloadWeapon()
 void AShooterCharacter::FinishReloading()
 {
 	CombatState = ECombatState::ECS_Unoccupied;
+	if (bAimingButtonPressed)
+	{
+		Aim();
+	}
+	
 	if(bAimingButtonPressed) bAiming = true;
 	if(EquippedWeapon == nullptr) return;
 	const auto AmmoType = EquippedWeapon -> GetAmmoType();
@@ -740,6 +773,10 @@ void AShooterCharacter::FinishReloading()
 void AShooterCharacter::FinishEquipping()
 {
 	CombatState = ECombatState::ECS_Unoccupied;
+	if(bAimingButtonPressed)
+	{
+		Aim();
+	}
 }
 
 bool AShooterCharacter::CarryingAmmo()

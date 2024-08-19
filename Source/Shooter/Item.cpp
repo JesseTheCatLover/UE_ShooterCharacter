@@ -71,6 +71,8 @@ void AItem::BeginPlay()
 		// Hide the Pickup widget by default
 		PickupWidget -> SetVisibility(false);
 	}
+	// Load rarity data table
+	LoadRarityData();
 	// Set ActiveStars array based on item rarity
 	SetActiveStars();
 	// Setup overlap for AreaSphere
@@ -129,13 +131,13 @@ void AItem::SetActiveStars()
 		ActiveStars[3] = true;
 	case EItemRarity::EIR_Common:
 		ActiveStars[2] = true;
-	case EItemRarity::EIR_Damaged:
 		ActiveStars[1] = true; break;
 	}
 }
 
 void AItem::UpdateItemProperties(EItemState State)
 {
+	if(!ItemMesh || !PickupWidget) return;
 	switch(State)
 	{
 	case EItemState::EIS_Pickup:
@@ -208,7 +210,7 @@ void AItem::StartPickingItem(AShooterCharacter* Char, bool bForcePlay)
 	// Add 1 to the ItemCount for this interpolation struct 
 	Character -> IncrementInterpLocItemCount(InterpLocationIndex, 1);
 	
-	PlayPickupSound(true);
+	PlayPickupSound(bForcePlay);
 	
 	ItemInterpStartLocation = GetActorLocation();
 	bInterping = true;
@@ -350,6 +352,7 @@ void AItem::OnConstruction(const FTransform& Transform)
 
 	if(GlowMaterialInstance)
 	{
+		PreviousMaterialIndex = GlowMaterialIndex;
 		GlowMaterialInstanceDynamic = UMaterialInstanceDynamic::Create(GlowMaterialInstance, this);
 		GlowMaterialInstanceDynamic -> SetVectorParameterValue(TEXT("FresnelColor"), GlowColor);
 		ItemMesh -> SetMaterial(GlowMaterialIndex, GlowMaterialInstanceDynamic);

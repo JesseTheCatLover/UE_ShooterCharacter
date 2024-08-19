@@ -5,6 +5,7 @@
 #include "ShooterCharacter.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "Weapon.h"
 
 UShooterAnimInstance::UShooterAnimInstance():
 	Speed(0.f),
@@ -30,10 +31,11 @@ UShooterAnimInstance::UShooterAnimInstance():
 	bCanIdle(true),
 	IdleCoolDown(7.f),
 	RecoilWeight(1.f),
-	JogTurningInterpSpeed(15.f)
-{
+	JogTurningInterpSpeed(15.f),
+	EquippedWeaponType(EWeaponType::EWT_DefaultMax),
+	bShouldUseFABRIK(false)
 	
-}
+{}
 
 void UShooterAnimInstance::UpdateAnimation(float DeltaTime)
 {
@@ -68,6 +70,8 @@ void UShooterAnimInstance::UpdateAnimationProperties()
 	bReloading = ShooterCharacter -> GetCombatState() == ECombatState::ECS_Reloading;
 	bEquipping = ShooterCharacter -> GetCombatState() == ECombatState::ECS_Equipping;
 	bIsInAir = ShooterCharacter -> GetCharacterMovement() -> IsFalling();
+	bShouldUseFABRIK = ShooterCharacter -> GetCombatState() == ECombatState::ECS_Unoccupied ||
+		ShooterCharacter -> GetCombatState() == ECombatState::ECS_FireRateTimerInProgress;
 	
 	// Is the character accelerating?
 	if(ShooterCharacter -> GetCharacterMovement() -> GetCurrentAcceleration().Size() > 0.f)
@@ -78,6 +82,10 @@ void UShooterAnimInstance::UpdateAnimationProperties()
 	{
 		bIsAccelerating = false;
 	}
+
+	// EquippedWeaponType
+	if(ShooterCharacter -> GetEquippedWeapon())
+		EquippedWeaponType = ShooterCharacter -> GetEquippedWeapon() -> GetWeaponType();
 
 	// OffsetState
 	if(bIsInAir) OffsetState = EOffsetState::EOS_InAir;

@@ -37,7 +37,7 @@ enum class EItemType : uint8
 	EIT_Weapon UMETA(DisplayName = "Weapon"),
 	EIT_Ammo UMETA(DisplayName = "Ammo"),
 
-	EIT_Max UMETA(DisplayName" DefaultMax")
+	EIT_Max UMETA(DisplayName = " DefaultMax")
 };
 
 USTRUCT(BlueprintType)
@@ -228,6 +228,9 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = GlowMaterial, meta = (AllowPrivateAccess = "true"))
 	int32 GlowMaterialIndex;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = GlowMateial, meta = (AllowPrivateAccess = "true"))
+	int32 PreviousMaterialIndex;
+
 	/** Name of the Glow blend alpha parameter */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = GlowMaterial, meta = (AllowPrivateAccess = "true"))
 	FName GlowBlendAlphaParameterName;
@@ -259,6 +262,10 @@ private:
 	/** Dynamic instance that changes at runtime */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = GlowMaterial, meta = (AllowPrivateAccess = "true"))
 	UMaterialInstanceDynamic* GlowMaterialInstanceDynamic;
+
+	/** Material instance used with dynamic material instance */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = GlowMaterial, meta = (AllowPrivateAccess = "true"))
+	UMaterialInstance* MaterialInstance;
 
 	/** CurveVector for glow pulse */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = GlowMaterial, meta = (AllowPrivateAccess = "true"))
@@ -322,9 +329,24 @@ public:
 	FORCEINLINE USoundCue* GetPickupSound() const { return PickupSound; }
 	FORCEINLINE USoundCue* GetEquipSound() const { return EquipSound; }
 	FORCEINLINE int32 GetSlotIndex() const { return SlotIndex; }
+	FORCEINLINE UMaterialInstance* GetMaterialInstance() const { return MaterialInstance; }
+	FORCEINLINE int32 GetGlowMaterialIndex() const { return GlowMaterialIndex; }
+	FORCEINLINE int32 GetPreviousMaterialIndex() const { return PreviousMaterialIndex; }
+	FORCEINLINE UMaterialInstanceDynamic* GetGlowMaterialInstanceDynamic() const { return GlowMaterialInstanceDynamic; }
 	FORCEINLINE void SetSlotIndex(int32 Index) { SlotIndex = Index; }
+	FORCEINLINE FLinearColor GetGlowColor() const { return GlowColor; }
 	FORCEINLINE void SetCharacter(AShooterCharacter* Char) { Character = Char; }
 	FORCEINLINE void SetCharacterInventoryFull(bool bFull) { bCharacterInventoryFull = bFull; }
+	FORCEINLINE void SetItemName(FString Name) { ItemName = Name; }
+	FORCEINLINE void SetItemIcon(UTexture2D* Icon) { ItemIcon = Icon; }
+	FORCEINLINE void SetAmmoTypeIcon(UTexture2D* Icon) { AmmoTypeIcon = Icon; }
+	FORCEINLINE void SetPickupSound(USoundCue* Sound) { PickupSound = Sound; }
+	FORCEINLINE void SetEquipSound(USoundCue* Sound) { EquipSound = Sound; }
+	FORCEINLINE void SetPickupWidget(UWidgetComponent* Widget) { PickupWidget = Widget; }
+	FORCEINLINE void SetMaterialInstance(UMaterialInstance* Instance) { MaterialInstance = Instance; }
+	FORCEINLINE void SetGlowMaterialInstanceDynamic(UMaterialInstanceDynamic* Instance) { GlowMaterialInstanceDynamic = Instance; }
+	FORCEINLINE void SetGlowMaterialIndex(int32 Value) { GlowMaterialIndex = Value; }
+	FORCEINLINE void SetPreviousMaterialIndex(int32 Value) { PreviousMaterialIndex = Value; }
 	
 	/** Set new state for ItemState and calls UpdateItemProperties() */
 	void SetItemState(EItemState State);

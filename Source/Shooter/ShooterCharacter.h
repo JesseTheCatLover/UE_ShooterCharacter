@@ -1,4 +1,4 @@
-// Copyright 2023 JesseTheCatLover. All Rights Reserved.
+// Copyright 2024 JesseTheCatLover. All Rights Reserved.
 
 #pragma once
 
@@ -14,7 +14,7 @@ enum class ECombatState : uint8
 	ECS_FireRateTimerInProgress UMETA(DisplayName = "FireRateTimerInProgress"),
 	ECS_Reloading UMETA(DisplayName = "Reloading"),
 	ECS_Equipping UMETA(DisplayName = "Equipping"),
-
+	
 	ECS_Max UMETA(DisplayName = "DefaultMax")
 };
 
@@ -91,6 +91,9 @@ protected:
 
 	/** Set bAiming to true or false with button pressed */
 	void AimingButtonReleased();
+
+	void Aim();
+	void StopAiming();
 
 	/** Perform a line trace from crosshair screen location outward */
 	bool LineTraceFromCrosshair(FHitResult &OutHitResult) const;
@@ -291,14 +294,6 @@ private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"),
 		meta = (ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))
 	float MouseAimingLookUpRate;
-
-	/** Randomized gunshot sound cue */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Combat , meta = (AllowPrivateAccess = "true"))
-	class USoundCue* FireSound;
-
-	/** Flash spawned at BarrelSocket */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Combat , meta = (AllowPrivateAccess = "true"))
-	UParticleSystem* MuzzleFlash;
 	
 	/** Montage for firing weapon */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Combat , meta = (AllowPrivateAccess = "true"))
@@ -367,9 +362,6 @@ private:
 	/** True while gun is firing */
 	bool bFiringBullet;
 
-	/** Rate of automatic gun fire */
-	float AutomaticFireRate;
-	
 	/** Duration of crosshair spread for shooting */
 	float CrosshairShootingDuration;
 	
@@ -379,7 +371,7 @@ private:
 	/** Sets a timer between crosshair spreads */
 	FTimerHandle CrosshairShootTimer;
 
-	/** True if we should trac every frame for items */
+	/** True if we should trace items for every frame */
 	bool bShouldTraceForItems;
 
 	/** Number of overlapped AItem */
@@ -563,6 +555,8 @@ public:
 	FORCEINLINE bool GetShouldPickupSound() const { return bShouldPlayPickupSound; }
 
 	FORCEINLINE bool GetShouldEquipSound() const { return bShouldPlayEquipSound; };
+
+	FORCEINLINE AWeapon* GetEquippedWeapon() const { return EquippedWeapon; }
 
 	/** Add/subtract OverlappedItemCount and updates bShouldTraceForItems */
 	void IncrementOverlappedItemCount(int8 Value);
