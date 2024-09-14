@@ -30,6 +30,12 @@ struct FWeaponDataTable : public FTableRowBase
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 StartingAmmo;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float Damage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float HeadshotDamage;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 MagazineCapacity;
@@ -139,6 +145,12 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Properties", meta = (AllowPrivateAccess = "true"))
 	int32 MagazineCapacity;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Properties", meta = (AllowPrivateAccess = "true"))
+	float Damage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Properties", meta = (AllowPrivateAccess = "true"))
+	float HeadshotDamage;
+
 	/** Type of weapon */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Properties", meta = (AllowPrivateAccess = "true"))
 	EWeaponType WeaponType;
@@ -231,6 +243,8 @@ public:
 	
 	FORCEINLINE int32 GetAmmo() const { return Ammo; }
 	FORCEINLINE int32 GetMagazineCapacity() const { return MagazineCapacity; }
+	FORCEINLINE float GetDamage() const { return Damage; }
+	FORCEINLINE float GetHeadshotDamage() const { return HeadshotDamage; }
 	FORCEINLINE EAmmoType GetAmmoType() const { return AmmoType; }
 	FORCEINLINE EWeaponType GetWeaponType() const { return WeaponType; }
 	FORCEINLINE FName GetReloadMontageSection() const { return ReloadMontageSection; }

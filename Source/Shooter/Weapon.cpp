@@ -8,6 +8,8 @@ AWeapon::AWeapon():
 	bFalling(false),
 	Ammo(30),
 	MagazineCapacity(30),
+	Damage(10.f),
+	HeadshotDamage(20.f),
 	WeaponType(EWeaponType::EWT_SubmachineGun),
 	AmmoType(EAmmoType::EAT_9mm),
 	ReloadMontageSection(FName(TEXT("RELOAD_SMG"))),
@@ -119,6 +121,8 @@ void AWeapon::LoadWeaponTypeData()
 			AmmoType = WeaponDataRow -> AmmoType;
 			Ammo = WeaponDataRow -> StartingAmmo;
 			MagazineCapacity = WeaponDataRow -> MagazineCapacity;
+			Damage = WeaponDataRow -> Damage;
+			HeadshotDamage = WeaponDataRow -> HeadshotDamage;
 			SetPickupSound(WeaponDataRow -> PickupSound);
 			SetEquipSound(WeaponDataRow -> EquipSound);
 			SetGlowMaterialIndex(WeaponDataRow -> GlowMaterialIndex);

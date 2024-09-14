@@ -3,7 +3,10 @@
 #include "ShooterCharacter.h"
 
 #include "Ammo.h"
+#include "BulletHitInterface.h"
+#include "Enemy.h"
 #include "Item.h"
+#include "Shooter.h"
 #include "Weapon.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
@@ -270,11 +273,11 @@ bool AShooterCharacter::LineTraceFromCrosshair(FHitResult &OutHitResult) const
 	return false;
 }
 
-bool AShooterCharacter::LineTraceFromGunBarrel(const FVector& MuzzleSocketLocation, FVector& OutBeamLocation) const
+bool AShooterCharacter::LineTraceFromGunBarrel(const FVector& MuzzleSocketLocation, FHitResult& OutHitResult) const
 {
 	FHitResult CrosshairHitResult;
 	LineTraceFromCrosshair(CrosshairHitResult);
-	OutBeamLocation = CrosshairHitResult.Location;
+	FVector OutBeamLocation = CrosshairHitResult.Location;
 	
 	/* If Crosshair's lineTrace hit something, OutBeamLocation will be set to
 	 * the location of the hit,
@@ -283,19 +286,18 @@ bool AShooterCharacter::LineTraceFromGunBarrel(const FVector& MuzzleSocketLocati
 	 */
 
 	// Performs a second line trace, this time from the gun barrel
-	FHitResult WeaponTraceHit;
 	const FVector WeaponTraceStart{ MuzzleSocketLocation };
 	const FVector StartToEnd{ OutBeamLocation - MuzzleSocketLocation };
 	const FVector WeaponTraceEnd{ MuzzleSocketLocation + StartToEnd * 1.25 };
 
-	GetWorld() -> LineTraceSingleByChannel(WeaponTraceHit, WeaponTraceStart, WeaponTraceEnd,
+	GetWorld() -> LineTraceSingleByChannel(OutHitResult, WeaponTraceStart, WeaponTraceEnd,
 	                                     ECollisionChannel::ECC_Visibility);
-	if(WeaponTraceHit.bBlockingHit) // Is there something between the barrel and the BeamEnd?
+	if(!OutHitResult.bBlockingHit) // Is there something between the barrel and the BeamEnd?
 	{
-		OutBeamLocation = WeaponTraceHit.Location;
-		return true;
+		OutHitResult.Location = OutBeamLocation;
+		return false;
 	}
-	return false;
+	return true;
 }
 
 void AShooterCharacter::FireButtonPressed()
@@ -676,13 +678,47 @@ void AShooterCharacter::SendBullet() const
 			UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), EquippedWeapon -> GetMuzzleFlash(), SocketTransform);
 		}
 
-		FVector BeamEndLocation;
-		bool bBeamEnd = LineTraceFromGunBarrel(SocketTransform.GetLocation(), BeamEndLocation);
+		FHitResult BeamHitResult;
+		bool bBeamEnd = LineTraceFromGunBarrel(SocketTransform.GetLocation(), BeamHitResult);
 		if(bBeamEnd)
 		{
+			if(BeamHitResult.GetActor())
+			{
+				// Does hit actor implement BulletHitInterface?
+				IBulletHitInterface* BulletHitInterface = Cast<IBulletHitInterface>(BeamHitResult.GetActor());
+				if(BulletHitInterface)
+				{
+					BulletHitInterface -> BulletHit_Implementation(BeamHitResult);
+				}
+				
+				AEnemy* HitEnemy = Cast<AEnemy>(BeamHitResult.GetActor());
+				if(HitEnemy)
+				{
+					if(*BeamHitResult.BoneName.ToString() == HitEnemy -> GetHeadBone())
+					{ // Headshot
+						float Damage = UGameplayStatics::ApplyDamage(BeamHitResult.GetActor(),
+							EquippedWeapon -> GetHeadshotDamage(), GetController(), EquippedWeapon, UDamageType::StaticClass());
+						HitEnemy -> ShowHitNumber(Damage, BeamHitResult.Location, true);
+					}
+					else
+					{ // Bodyshot
+						float Damage = UGameplayStatics::ApplyDamage(BeamHitResult.GetActor(),
+							EquippedWeapon -> GetDamage(), GetController(), EquippedWeapon, UDamageType::StaticClass());
+						HitEnemy -> ShowHitNumber(Damage, BeamHitResult.Location, false);
+					}
+				}
+			}
+			else
+			{ // Spawn default particles
+				if(ImpactParticles)
+				{
+					UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactParticles, BeamHitResult.Location);
+				}
+			}
+			
 			if(ImpactParticles)
 			{
-				UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactParticles, BeamEndLocation);
+				UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactParticles, BeamHitResult.Location);
 			}
 
 			if(BeamParticles)
@@ -691,7 +727,7 @@ void AShooterCharacter::SendBullet() const
 					GetWorld(), BeamParticles, SocketTransform);
 				if(Beam)
 				{
-					Beam -> SetVectorParameter(FName("Target"), BeamEndLocation);
+					Beam -> SetVectorParameter(FName("Target"), BeamHitResult.Location);
 				}
 			}
 		}
@@ -1001,6 +1037,18 @@ int32 AShooterCharacter::GetEmptyInventorySlotIndex()
 		return Inventory.Num();
 	}
 	return -1; // No empty slots
+}
+
+EPhysicalSurface AShooterCharacter::GetSurfaceType()
+{
+	FHitResult HitResult;
+	const FVector Begin = GetActorLocation();
+	const FVector End = { Begin + FVector(0.f, 0.f, -400.f) }; 
+	FCollisionQueryParams QueryParams;
+	QueryParams.bReturnPhysicalMaterial = true;
+	
+	GetWorld() -> LineTraceSingleByChannel(HitResult, Begin, End, ECollisionChannel::ECC_Visibility, QueryParams);
+	return UPhysicalMaterial::DetermineSurfaceType(HitResult.PhysMaterial.Get());
 }
 
 void AShooterCharacter::HighlightInventorySlot()

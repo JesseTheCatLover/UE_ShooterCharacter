@@ -101,9 +101,9 @@ protected:
 	/** Perform a second line trace from gun barrel to where the beam ends and mix the two trace together
 	 *  and get the end location vector
 	 *  @param MuzzleSocketLocation The location of gun barrel tip and where Muzzle particle spawns
-	 *  @param OutBeamLocation Give out the location of where beam trace ends
+	 *  @param OutHitResult Give out the location of where beam trace ends
 	 */
-	bool LineTraceFromGunBarrel(const FVector& MuzzleSocketLocation, FVector& OutBeamLocation) const;
+	bool LineTraceFromGunBarrel(const FVector &MuzzleSocketLocation, FHitResult &OutHitResult) const;
 
 	/** Calculate camera interpolation zoom */
 	void HandleCameraInterpZoom(float DeltaTime);
@@ -230,6 +230,9 @@ protected:
 
 	/** Return the first empty slot in our inventory list */
 	int32 GetEmptyInventorySlotIndex();
+
+	UFUNCTION(BlueprintCallable)
+	EPhysicalSurface GetSurfaceType();
 	
 public:	
 	// Called every frame
