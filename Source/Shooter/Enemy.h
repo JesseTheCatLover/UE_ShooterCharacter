@@ -29,7 +29,19 @@ protected:
 	void HideHealthBar();
 
 	void Die();
+
+	UFUNCTION(BlueprintCallable)
+	void FinishDeath();
+
+	void DestroyEnemy();
+	
 	void PlayHitMontage(FName Section, float PlayRate = 1.f);
+
+	UFUNCTION(BlueprintCallable)
+	void PlayAttackMontage(FName Section, float PlayRate = 1.f);
+
+	UFUNCTION(BlueprintPure)
+	FName GetRandomAttackSectionName();
 
 	void ResetHitReactTimer();
 
@@ -41,9 +53,47 @@ protected:
 
 	void UpdateHitLocation();
 
+	UFUNCTION()
+	void AgroSphereOverlapped(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp,
+		int32 OtherBodyIndex, bool bFromSweep, const FHitResult &SweepResult);
+		
+	UFUNCTION(BlueprintCallable)
+	void SetStunned(bool Stunned);
+
+	UFUNCTION()
+	void AttackSphereOverlapped(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp,
+		int32 OtherBodyIndex, bool bFromSweep, const FHitResult &SweepResult);
+
+	UFUNCTION()
+	void AttackSphereOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp,
+		int32 OtherBodyIndex);
+
+	UFUNCTION()
+	void RightMeleeBoxOverlapped(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp,
+		int32 OtherBodyIndex, bool bFromSweep, const FHitResult &SweepResult);
+
+	UFUNCTION()
+	void LeftMeleeBoxOverlapped(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp,
+		int32 OtherBodyIndex, bool bFromSweep, const FHitResult &SweepResult);
+
+	UFUNCTION(BlueprintCallable)
+	void ActivateRightMeleeCollision();
+	UFUNCTION(BlueprintCallable)
+	void DeactivateRightMeleeCollision();
+	UFUNCTION(BlueprintCallable)
+	void ActivateLeftMeleeCollision();
+	UFUNCTION(BlueprintCallable)
+	void DeactivateLeftMeleeCollision();
+
+	void DoDamage(class AShooterCharacter* Victim);
+
+	void SpawnBlood(AShooterCharacter* Victim, FName SocketName);
+
+	void StunVictim(AShooterCharacter* Victim);
+	
 private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
-	class UParticleSystem* ImpactParticles;
+	class UParticleSystem* BulletImpactParticles;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
 	class USoundCue* ImpactSound;
@@ -55,12 +105,18 @@ private:
 	float Health;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
+	float HitDamage;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
 	FString HeadBone;
 
 	FTimerHandle HealthBarTimer;
 	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Combat, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat", meta = (AllowPrivateAccess = "true"))
 	float HealthBarDisplayDuration;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Combat")
+	USoundCue* MeleeHitImpactSound;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
 	UAnimMontage* HitMontage;
@@ -82,6 +138,71 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
 	float HitNumberDestroyTime;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
+	UAnimMontage* AttackMontage;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
+	FName AttackRFast;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
+	FName AttackR;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
+	FName AttackLFast;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
+	FName AttackL;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Combat")
+	FName RightMeleeTipSocketName;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Combat")
+	FName LeftMeleeTipSocketName;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Combat")
+	UAnimMontage* DeathMontage;
+
+	UPROPERTY(VisibleAnywhere, Category = "Combat")
+	bool bDying;
+
+	FTimerHandle DeathDestroyTimer;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Combat")
+	float DeathDestroyDuration;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI", meta = (AllowPrivateAccess = "true"))
+	class UBehaviorTree* BehaviorTree;
+
+	UPROPERTY()
+	class AEnemyController* EnemyController;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI", meta = (AllowPrivateAccess = "true", MakeEditWidget = "true"))
+	FVector PatrolPointFirst;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI", meta = (AllowPrivateAccess = "true", MakeEditWidget = "true"))
+	FVector PatrolPointSecond;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Combat", meta = (AllowPrivateAccess = "true"))
+	class USphereComponent* AgroSphere;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
+	bool bStunned;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Combat", meta = (AllowPrivateAccess = "true", UIMin = "0.0", UIMax = "1.0"))
+	float StunChance;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
+	bool bInAttackRange;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
+	USphereComponent* AttackRangeSphere;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
+	class UBoxComponent* RightMeleeBox;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
+	UBoxComponent* LeftMeleeBox;
 	
 public:
 	// Called every frame
@@ -95,7 +216,8 @@ public:
 	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
 
 	FORCEINLINE FString GetHeadBone() const { return HeadBone; }
-
+	FORCEINLINE UBehaviorTree* GetBehaviorTree() const { return BehaviorTree; }
+	
 	UFUNCTION(BlueprintImplementableEvent)
 	void ShowHitNumber(int32 Damage, FVector HitLocation, bool bHeadShot);
 };

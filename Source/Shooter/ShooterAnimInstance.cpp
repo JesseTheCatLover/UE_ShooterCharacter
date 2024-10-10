@@ -107,6 +107,7 @@ void UShooterAnimInstance::UpdateIsIdle()
 	else if(bEquipping) bIsIdle = false;
 	else if(bTurning) bIsIdle = false;
 	else if(bCrouching) bIsIdle = false;
+	else if(ShooterCharacter -> GetCombatState() != ECombatState::ECS_Unoccupied) bIsIdle = false;
 	else bIsIdle = true;
 }
 

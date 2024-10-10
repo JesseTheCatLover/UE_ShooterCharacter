@@ -14,6 +14,7 @@ enum class ECombatState : uint8
 	ECS_FireRateTimerInProgress UMETA(DisplayName = "FireRateTimerInProgress"),
 	ECS_Reloading UMETA(DisplayName = "Reloading"),
 	ECS_Equipping UMETA(DisplayName = "Equipping"),
+	ECS_Stunned UMETA(DisplayName = "Stunned"),
 	
 	ECS_Max UMETA(DisplayName = "DefaultMax")
 };
@@ -43,6 +44,8 @@ class SHOOTER_API AShooterCharacter : public ACharacter
 public:
 	// Sets default values for this character's properties
 	AShooterCharacter();
+
+	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
 
 protected:
 	// Called when the game starts or when spawned
@@ -233,6 +236,14 @@ protected:
 
 	UFUNCTION(BlueprintCallable)
 	EPhysicalSurface GetSurfaceType();
+
+	void Die();
+
+	UFUNCTION(BlueprintCallable)
+	void FinishDeath();
+
+	UFUNCTION(BlueprintCallable)
+	void EndStun();
 	
 public:	
 	// Called every frame
@@ -306,12 +317,24 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Combat , meta = (AllowPrivateAccess = "true"))
 	UAnimMontage* HipEquipMontage;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Combat")
+	UAnimMontage* HitReactMontage;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Combat", meta = (UIMin = "0.0", UIMax = "1.0"))
+	float StunChance;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Combat")
+	UAnimMontage* DeathMontage;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Combat")
+	UParticleSystem* BloodParticles;
+	
 	/** Particles spawned upon bullet impact */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Combat , meta = (AllowPrivateAccess = "true"))
-	UParticleSystem* ImpactParticles;
+	UPROPERTY(EditDefaultsOnly, Category = Combat , meta = (AllowPrivateAccess = "true"))
+	UParticleSystem* BulletImpactParticles;
 	
 	/** Smoke trail for bullets */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Combat , meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditDefaultsOnly, Category = Combat , meta = (AllowPrivateAccess = "true"))
 	UParticleSystem* BeamParticles;
 
 	/** True when aiming */
@@ -333,6 +356,12 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Combat, meta = (AllowPrivateAccess = "true"))
 	float ZoomInterpSpeed;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
+	float MaxHealth;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
+	float Health;
+	
 	/** Determines the spread of the crosshairs */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Crosshairs, meta = (AllowPrivateAccess = "true"))
 	float CrosshairSpreadingMultiplier;
@@ -561,6 +590,10 @@ public:
 
 	FORCEINLINE AWeapon* GetEquippedWeapon() const { return EquippedWeapon; }
 
+	FORCEINLINE float GetStunChance() const { return StunChance; }
+	
+	FORCEINLINE UParticleSystem* GetBloodParticles() const { return BloodParticles; }
+
 	/** Add/subtract OverlappedItemCount and updates bShouldTraceForItems */
 	void IncrementOverlappedItemCount(int8 Value);
 
@@ -583,4 +616,6 @@ public:
 
 	void HighlightInventorySlot();
 	void UnHighlightInventorySlot();
+
+	void Stun();
 };
